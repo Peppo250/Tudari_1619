@@ -14,7 +14,333 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      logs: {
+        Row: {
+          created_at: string | null
+          date: string
+          day: string
+          end_time: string
+          id: string
+          intensity: number
+          note: string | null
+          start_time: string
+          topic: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          date: string
+          day: string
+          end_time: string
+          id?: string
+          intensity: number
+          note?: string | null
+          start_time: string
+          topic: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          day?: string
+          end_time?: string
+          id?: string
+          intensity?: number
+          note?: string | null
+          start_time?: string
+          topic?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notes: {
+        Row: {
+          content_type: string | null
+          created_at: string | null
+          id: string
+          images: Json | null
+          quiz_id: string | null
+          strokes: Json | null
+          summary: string | null
+          text_content: string | null
+          title: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          content_type?: string | null
+          created_at?: string | null
+          id?: string
+          images?: Json | null
+          quiz_id?: string | null
+          strokes?: Json | null
+          summary?: string | null
+          text_content?: string | null
+          title?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          content_type?: string | null
+          created_at?: string | null
+          id?: string
+          images?: Json | null
+          quiz_id?: string | null
+          strokes?: Json | null
+          summary?: string | null
+          text_content?: string | null
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      productivity: {
+        Row: {
+          created_at: string | null
+          date: string
+          id: string
+          logs_intensity_total: number | null
+          notes_count: number | null
+          quiz_score: number | null
+          score: number
+          streak: number
+          tasks_completed: number | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          date: string
+          id?: string
+          logs_intensity_total?: number | null
+          notes_count?: number | null
+          quiz_score?: number | null
+          score?: number
+          streak?: number
+          tasks_completed?: number | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          id?: string
+          logs_intensity_total?: number | null
+          notes_count?: number | null
+          quiz_score?: number | null
+          score?: number
+          streak?: number
+          tasks_completed?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          email: string | null
+          free_time: Json | null
+          id: string
+          name: string | null
+          updated_at: string | null
+          username: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          email?: string | null
+          free_time?: Json | null
+          id: string
+          name?: string | null
+          updated_at?: string | null
+          username?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          email?: string | null
+          free_time?: Json | null
+          id?: string
+          name?: string | null
+          updated_at?: string | null
+          username?: string | null
+        }
+        Relationships: []
+      }
+      projects: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          title: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          title: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      quiz_results: {
+        Row: {
+          answers: Json
+          completed_at: string | null
+          id: string
+          quiz_id: string
+          score: number
+          total_questions: number
+          user_id: string
+        }
+        Insert: {
+          answers?: Json
+          completed_at?: string | null
+          id?: string
+          quiz_id: string
+          score: number
+          total_questions: number
+          user_id: string
+        }
+        Update: {
+          answers?: Json
+          completed_at?: string | null
+          id?: string
+          quiz_id?: string
+          score?: number
+          total_questions?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_results_quiz_id_fkey"
+            columns: ["quiz_id"]
+            isOneToOne: false
+            referencedRelation: "quizzes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quizzes: {
+        Row: {
+          created_at: string | null
+          id: string
+          note_id: string
+          questions: Json
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          note_id: string
+          questions?: Json
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          note_id?: string
+          questions?: Json
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quizzes_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: false
+            referencedRelation: "notes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rewards: {
+        Row: {
+          description: string | null
+          id: string
+          name: string
+          type: string
+          unlocked_at: string | null
+          user_id: string
+        }
+        Insert: {
+          description?: string | null
+          id?: string
+          name: string
+          type: string
+          unlocked_at?: string | null
+          user_id: string
+        }
+        Update: {
+          description?: string | null
+          id?: string
+          name?: string
+          type?: string
+          unlocked_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      tasks: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          description: string | null
+          due_date: string | null
+          id: string
+          priority: string | null
+          project_id: string | null
+          status: string
+          title: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          priority?: string | null
+          project_id?: string | null
+          status?: string
+          title: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          priority?: string | null
+          project_id?: string | null
+          status?: string
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
