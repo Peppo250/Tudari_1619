@@ -14,30 +14,42 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const Home = () => {
   const navigate = useNavigate();
   const [isDark, setIsDark] = useState(false);
-  const [user, setUser] = useState<{ username: string } | null>(null);
+  const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
-    // Check auth
-    const userData = localStorage.getItem("tudari_user");
-    if (!userData) {
-      navigate("/login");
-      return;
-    }
-    setUser(JSON.parse(userData));
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        navigate("/auth");
+      } else {
+        setUser(session.user);
+      }
+    });
 
-    // Check theme
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!session) {
+        navigate("/auth");
+      } else {
+        setUser(session.user);
+      }
+    });
+
     if (document.documentElement.classList.contains('dark')) {
       setIsDark(true);
     }
+
+    return () => subscription.unsubscribe();
   }, [navigate]);
 
-  const handleLogout = () => {
-    localStorage.removeItem("tudari_user");
-    navigate("/login");
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    toast.success("Logged out successfully");
+    navigate("/auth");
   };
 
   const toggleTheme = () => {
@@ -114,7 +126,7 @@ const Home = () => {
             </Button>
             <Button variant="ghost" onClick={() => navigate("/profile")}>
               <User className="w-4 h-4 mr-2" />
-              {user.username}
+              {user?.user_metadata?.username || user?.email}
             </Button>
             <Button variant="ghost" size="icon" onClick={handleLogout}>
               <LogOut className="w-5 h-5" />
@@ -130,7 +142,7 @@ const Home = () => {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <h2 className="text-3xl font-bold mb-2">Welcome back, {user.username}! 👋</h2>
+          <h2 className="text-3xl font-bold mb-2">Welcome back, {user?.user_metadata?.username || user?.email}! 👋</h2>
           <p className="text-muted-foreground flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-primary" />
             Ready to make today productive?
