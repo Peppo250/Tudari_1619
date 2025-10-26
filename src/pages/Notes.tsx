@@ -1,51 +1,80 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Plus, Search, FileText, Sparkles } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { ArrowLeft, Plus, FileText, Search, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { motion } from "framer-motion";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Note {
   id: string;
   title: string;
-  createdAt: string;
-  updatedAt: string;
+  created_at: string;
+  updated_at: string;
   summary?: string;
+  text_content?: string;
 }
 
 const Notes = () => {
   const navigate = useNavigate();
   const [notes, setNotes] = useState<Note[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check auth
-    const userData = localStorage.getItem("tudari_user");
-    if (!userData) {
-      navigate("/login");
-      return;
-    }
+    loadNotes();
+  }, []);
 
-    // Load notes from localStorage (temporary storage)
-    const savedNotes = localStorage.getItem("tudari_notes");
-    if (savedNotes) {
-      setNotes(JSON.parse(savedNotes));
-    }
-  }, [navigate]);
+  const loadNotes = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        navigate("/auth");
+        return;
+      }
 
-  const createNewNote = () => {
-    const newNote: Note = {
-      id: `note-${Date.now()}`,
-      title: "Untitled Note",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    
-    const updatedNotes = [newNote, ...notes];
-    setNotes(updatedNotes);
-    localStorage.setItem("tudari_notes", JSON.stringify(updatedNotes));
-    navigate(`/notes/${newNote.id}`);
+      const { data, error } = await supabase
+        .from('notes')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false });
+
+      if (error) throw error;
+
+      setNotes(data || []);
+    } catch (error) {
+      console.error("Error loading notes:", error);
+      toast.error("Failed to load notes");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createNewNote = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('notes')
+        .insert({
+          title: "Untitled Note",
+          user_id: user.id,
+          content_type: "canvas"
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast.success("New note created!");
+      navigate(`/note/${data.id}`);
+    } catch (error) {
+      console.error("Error creating note:", error);
+      toast.error("Failed to create note");
+    }
   };
 
   const filteredNotes = notes.filter(note =>
@@ -56,7 +85,7 @@ const Notes = () => {
     hidden: { opacity: 0 },
     show: {
       opacity: 1,
-      transition: { staggerChildren: 0.05 }
+      transition: { staggerChildren: 0.1 }
     }
   };
 
@@ -67,7 +96,6 @@ const Notes = () => {
 
   return (
     <div className="min-h-screen bg-gradient-subtle">
-      {/* Header */}
       <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50 shadow-soft">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -75,24 +103,21 @@ const Notes = () => {
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold">Notes</h1>
-              <p className="text-xs text-muted-foreground">Create and manage your notes</p>
+              <h1 className="text-2xl font-bold">My Notes</h1>
+              <p className="text-xs text-muted-foreground">Create and manage your study notes</p>
             </div>
           </div>
-          
-          <Button onClick={createNewNote} className="shadow-medium hover:shadow-strong">
+          <Button onClick={createNewNote} className="shadow-medium">
             <Plus className="w-4 h-4 mr-2" />
             New Note
           </Button>
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
-        {/* Search Bar */}
-        <div className="mb-8">
+        <div className="mb-6">
           <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
             <Input
               type="text"
               placeholder="Search notes..."
@@ -103,23 +128,26 @@ const Notes = () => {
           </div>
         </div>
 
-        {/* Notes Grid */}
-        {filteredNotes.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="w-8 h-8 animate-spin" />
+          </div>
+        ) : filteredNotes.length === 0 ? (
           <div className="text-center py-16">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-hero mb-4 shadow-glow">
-              <FileText className="w-10 h-10 text-white" />
-            </div>
+            <FileText className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
             <h3 className="text-2xl font-bold mb-2">No Notes Yet</h3>
             <p className="text-muted-foreground mb-6">
-              Start your learning journey by creating your first note
+              {searchQuery ? "No notes match your search" : "Start creating your first note!"}
             </p>
-            <Button onClick={createNewNote} size="lg" className="shadow-medium hover:shadow-strong">
-              <Plus className="w-4 h-4 mr-2" />
-              Create Your First Note
-            </Button>
+            {!searchQuery && (
+              <Button onClick={createNewNote} size="lg" className="shadow-medium">
+                <Plus className="w-5 h-5 mr-2" />
+                Create Your First Note
+              </Button>
+            )}
           </div>
         ) : (
-          <motion.div
+          <motion.div 
             variants={container}
             initial="hidden"
             animate="show"
@@ -128,35 +156,25 @@ const Notes = () => {
             {filteredNotes.map((note) => (
               <motion.div key={note.id} variants={item}>
                 <Card 
-                  className="group cursor-pointer hover:shadow-strong transition-all duration-300 border-0 h-full"
-                  onClick={() => navigate(`/notes/${note.id}`)}
+                  className="p-6 cursor-pointer hover:shadow-strong transition-all duration-300 group"
+                  onClick={() => navigate(`/note/${note.id}`)}
                 >
-                  <CardHeader>
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="w-12 h-12 rounded-lg bg-gradient-primary flex items-center justify-center shadow-medium group-hover:shadow-glow transition-all">
-                        <FileText className="w-6 h-6 text-white" />
-                      </div>
+                  <div className="flex items-start gap-3">
+                    <FileText className="w-5 h-5 text-primary mt-1" />
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-lg mb-1 truncate group-hover:text-primary transition-colors">
+                        {note.title}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        Updated {new Date(note.updated_at).toLocaleDateString()}
+                      </p>
                       {note.summary && (
-                        <div className="flex items-center gap-1 text-xs text-primary">
-                          <Sparkles className="w-3 h-3" />
-                          AI Summary
-                        </div>
+                        <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
+                          {note.summary}
+                        </p>
                       )}
                     </div>
-                    <CardTitle className="group-hover:text-primary transition-colors line-clamp-2">
-                      {note.title}
-                    </CardTitle>
-                    <CardDescription>
-                      Updated {new Date(note.updatedAt).toLocaleDateString()}
-                    </CardDescription>
-                  </CardHeader>
-                  {note.summary && (
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground line-clamp-3">
-                        {note.summary}
-                      </p>
-                    </CardContent>
-                  )}
+                  </div>
                 </Card>
               </motion.div>
             ))}
