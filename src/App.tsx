@@ -8,7 +8,7 @@ import Home from "./pages/Home";
 import Notes from "./pages/Notes";
 import NoteEditor from "./pages/NoteEditor";
 import Logs from "./pages/Logs";
-import Projects from "./pages/Projects";
+import Tasks from "./pages/Tasks";
 import Productivity from "./pages/Productivity";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
@@ -28,7 +28,7 @@ const App = () => (
           <Route path="/notes" element={<Notes />} />
           <Route path="/notes/:id" element={<NoteEditor />} />
           <Route path="/logs" element={<Logs />} />
-          <Route path="/projects" element={<Projects />} />
+          <Route path="/tasks" element={<Tasks />} />
           <Route path="/productivity" element={<Productivity />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="*" element={<NotFound />} />

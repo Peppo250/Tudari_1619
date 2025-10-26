@@ -70,7 +70,7 @@ const Notes = () => {
       if (error) throw error;
 
       toast.success("New note created!");
-      navigate(`/note/${data.id}`);
+      navigate(`/notes/${data.id}`);
     } catch (error) {
       console.error("Error creating note:", error);
       toast.error("Failed to create note");
@@ -157,7 +157,7 @@ const Notes = () => {
               <motion.div key={note.id} variants={item}>
                 <Card 
                   className="p-6 cursor-pointer hover:shadow-strong transition-all duration-300 group"
-                  onClick={() => navigate(`/note/${note.id}`)}
+                  onClick={() => navigate(`/notes/${note.id}`)}
                 >
                   <div className="flex items-start gap-3">
                     <FileText className="w-5 h-5 text-primary mt-1" />

@@ -77,7 +77,7 @@ const Home = () => {
       description: "Organize your work with Kanban boards and todos",
       icon: CheckSquare,
       color: "from-teal-500 to-teal-600",
-      path: "/projects"
+      path: "/tasks"
     },
     {
       title: "Productivity",

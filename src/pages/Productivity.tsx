@@ -29,6 +29,7 @@ const Productivity = () => {
   const [productivity, setProductivity] = useState<Productivity | null>(null);
   const [rewards, setRewards] = useState<Reward[]>([]);
   const [loading, setLoading] = useState(true);
+  const [calculating, setCalculating] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -75,8 +76,15 @@ const Productivity = () => {
   };
 
   const calculateProductivity = async () => {
+    setCalculating(true);
     try {
-      const { error } = await supabase.functions.invoke('calculate-productivity');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const today = new Date().toISOString().split('T')[0];
+      const { data, error } = await supabase.functions.invoke('calculate-productivity', {
+        body: { userId: user.id, date: today }
+      });
       
       if (error) throw error;
       
@@ -85,6 +93,8 @@ const Productivity = () => {
     } catch (error) {
       console.error("Error calculating productivity:", error);
       toast.error("Failed to calculate productivity");
+    } finally {
+      setCalculating(false);
     }
   };
 
@@ -101,8 +111,12 @@ const Productivity = () => {
               <p className="text-xs text-muted-foreground">Track your progress and rewards</p>
             </div>
           </div>
-          <Button onClick={calculateProductivity} className="shadow-medium">
-            <TrendingUp className="w-4 h-4 mr-2" />
+          <Button onClick={calculateProductivity} className="shadow-medium" disabled={calculating}>
+            {calculating ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <TrendingUp className="w-4 h-4 mr-2" />
+            )}
             Calculate Score
           </Button>
         </div>
