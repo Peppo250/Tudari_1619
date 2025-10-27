@@ -148,7 +148,7 @@ const Home = () => {
         opacity: 1,
         y: 0
       }} className="mb-8">
-          <h2 className="text-3xl font-bold mb-2">Welcome back, {profile?.name || profile?.username || user?.email}! 👋</h2>
+          <h2 className="text-3xl font-bold mb-2">Welcome back, {profile?.name || profile?.username || user?.email}!</h2>
           <p className="text-muted-foreground flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-primary" />
             Ready to make today productive?
