@@ -10,18 +10,31 @@ const Home = () => {
   const navigate = useNavigate();
   const [isDark, setIsDark] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
+
   useEffect(() => {
-    supabase.auth.getSession().then(({
-      data: {
-        session
-      }
-    }) => {
+    const loadUserAndProfile = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         navigate("/auth");
       } else {
         setUser(session.user);
+        
+        // Load profile data
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+        
+        if (profileData) {
+          setProfile(profileData);
+        }
       }
-    });
+    };
+
+    loadUserAndProfile();
+
     const {
       data: {
         subscription
@@ -31,6 +44,7 @@ const Home = () => {
         navigate("/auth");
       } else {
         setUser(session.user);
+        loadUserAndProfile();
       }
     });
     if (document.documentElement.classList.contains('dark')) {
@@ -116,7 +130,7 @@ const Home = () => {
             </Button>
             <Button variant="ghost" onClick={() => navigate("/profile")}>
               <User className="w-4 h-4 mr-2" />
-              {user?.user_metadata?.username || user?.email}
+              {profile?.name || profile?.username || user?.email}
             </Button>
             <Button variant="ghost" size="icon" onClick={handleLogout}>
               <LogOut className="w-5 h-5" />
@@ -134,7 +148,7 @@ const Home = () => {
         opacity: 1,
         y: 0
       }} className="mb-8">
-          <h2 className="text-3xl font-bold mb-2">Welcome back, {user?.user_metadata?.username || user?.email}! 👋</h2>
+          <h2 className="text-3xl font-bold mb-2">Welcome back, {profile?.name || profile?.username || user?.email}! 👋</h2>
           <p className="text-muted-foreground flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-primary" />
             Ready to make today productive?
