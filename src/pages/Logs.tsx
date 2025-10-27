@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ArrowLeft, Plus, Clock, Loader2, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Clock, Loader2, Trash2, Download } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Textarea } from "@/components/ui/textarea";
@@ -118,6 +118,20 @@ const Logs = () => {
     }
   };
 
+  const exportLogs = () => {
+    const content = logs.map(log => 
+      `Date: ${new Date(log.date).toLocaleDateString()} (${log.day})\nTopic: ${log.topic}\nTime: ${log.start_time} - ${log.end_time}\nIntensity: ${log.intensity}/10${log.note ? `\nNote: ${log.note}` : ''}\n${'='.repeat(50)}`
+    ).join('\n\n');
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `study-logs-${new Date().toISOString().split('T')[0]}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Logs exported!");
+  };
+
   return (
     <div className="min-h-screen bg-gradient-subtle">
       <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50 shadow-soft">
@@ -131,13 +145,20 @@ const Logs = () => {
               <p className="text-xs text-muted-foreground">Track your study sessions</p>
             </div>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="shadow-medium">
-                <Plus className="w-4 h-4 mr-2" />
-                New Log
+          <div className="flex items-center gap-2">
+            {logs.length > 0 && (
+              <Button variant="outline" size="sm" onClick={exportLogs}>
+                <Download className="w-4 h-4 mr-2" />
+                Export
               </Button>
-            </DialogTrigger>
+            )}
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="shadow-medium">
+                  <Plus className="w-4 h-4 mr-2" />
+                  New Log
+                </Button>
+              </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Create Study Log</DialogTitle>
@@ -195,6 +216,7 @@ const Logs = () => {
               </div>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
       </header>
 

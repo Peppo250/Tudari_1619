@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Plus, CheckSquare, Loader2, Trash2, Circle, CheckCircle2, Folder } from "lucide-react";
+import { ArrowLeft, Plus, CheckSquare, Loader2, Trash2, Circle, CheckCircle2, Folder, LayoutGrid } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -165,6 +165,19 @@ const Tasks = () => {
     }
   };
 
+  const deleteProject = async (projectId: string) => {
+    try {
+      const { error } = await supabase.from('projects').delete().eq('id', projectId);
+      if (error) throw error;
+      toast.success("Project deleted");
+      setSelectedProjectId("all");
+      loadData();
+    } catch (error) {
+      console.error("Error deleting project:", error);
+      toast.error("Failed to delete project");
+    }
+  };
+
   const filteredTasks = selectedProjectId === "all" 
     ? tasks 
     : tasks.filter(task => task.project_id === selectedProjectId);
@@ -266,19 +279,44 @@ const Tasks = () => {
             </div>
           </div>
           
-          <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-            <SelectTrigger className="max-w-xs">
-              <SelectValue placeholder="Select project" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Tasks</SelectItem>
-              {projects.map((project) => (
-                <SelectItem key={project.id} value={project.id}>
-                  {project.title}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+            <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+              <SelectTrigger className="max-w-xs">
+                <SelectValue placeholder="Select project" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Tasks</SelectItem>
+                {projects.map((project) => (
+                  <SelectItem key={project.id} value={project.id}>
+                    {project.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedProjectId !== "all" && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/projects/${selectedProjectId}`)}
+                >
+                  <LayoutGrid className="w-4 h-4 mr-2" />
+                  Kanban View
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    if (confirm("Delete this project and all its tasks?")) {
+                      deleteProject(selectedProjectId);
+                    }
+                  }}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </>
+            )}
+          </div>
         </div>
       </header>
 

@@ -7,20 +7,24 @@ import { Canvas as FabricCanvas, PencilBrush } from "fabric";
 import { 
   ArrowLeft, 
   Save, 
-  Undo, 
-  Redo, 
   Pen, 
   Eraser, 
-  Type,
   Palette,
   Sparkles,
   FileText,
-  Loader2
+  Loader2,
+  Download
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
+interface Question {
+  question: string;
+  options: string[];
+  correct_answer: number;
+}
 
 const NoteEditor = () => {
   const { id } = useParams();
@@ -29,7 +33,6 @@ const NoteEditor = () => {
   const [fabricCanvas, setFabricCanvas] = useState<FabricCanvas | null>(null);
   const [title, setTitle] = useState("Untitled Note");
   const [textContent, setTextContent] = useState("");
-  const [activeTab, setActiveTab] = useState<"canvas" | "text">("canvas");
   const [activeTool, setActiveTool] = useState<"pen" | "eraser">("pen");
   const [brushColor, setBrushColor] = useState("#3b82f6");
   const [brushSize, setBrushSize] = useState(2);
@@ -38,6 +41,10 @@ const NoteEditor = () => {
   const [summarizing, setSummarizing] = useState(false);
   const [generatingQuiz, setGeneratingQuiz] = useState(false);
   const [summary, setSummary] = useState("");
+  const [quizId, setQuizId] = useState<string | null>(null);
+  const [showQuiz, setShowQuiz] = useState(false);
+  const [quizData, setQuizData] = useState<Question[]>([]);
+  const [answers, setAnswers] = useState<Record<number, number>>({});
 
   useEffect(() => {
     loadNote();
@@ -68,12 +75,7 @@ const NoteEditor = () => {
           setTitle(note.title);
           setTextContent(note.text_content || "");
           setSummary(note.summary || "");
-          
-          if (note.strokes && Array.isArray(note.strokes) && note.strokes.length > 0) {
-            setActiveTab("canvas");
-          } else if (note.text_content) {
-            setActiveTab("text");
-          }
+          setQuizId(note.quiz_id);
         }
       }
     } catch (error) {
@@ -85,11 +87,11 @@ const NoteEditor = () => {
   };
 
   useEffect(() => {
-    if (!canvasRef.current || activeTab !== "canvas") return;
+    if (!canvasRef.current) return;
 
     const canvas = new FabricCanvas(canvasRef.current, {
-      width: 1000,
-      height: 700,
+      width: 800,
+      height: 400,
       backgroundColor: "#ffffff",
       isDrawingMode: true,
     });
@@ -104,7 +106,7 @@ const NoteEditor = () => {
     return () => {
       canvas.dispose();
     };
-  }, [activeTab]);
+  }, []);
 
   useEffect(() => {
     if (!fabricCanvas) return;
@@ -136,7 +138,6 @@ const NoteEditor = () => {
           title,
           text_content: textContent,
           strokes: canvasData ? canvasData.objects : [],
-          content_type: activeTab,
           updated_at: new Date().toISOString()
         })
         .eq('id', id);
@@ -186,8 +187,9 @@ const NoteEditor = () => {
 
       if (error) throw error;
       
-      if (data.quiz) {
-        toast.success("Quiz generated! You can find it in your quizzes.");
+      if (data.quizId) {
+        setQuizId(data.quizId);
+        toast.success("Quiz generated!");
       }
     } catch (error) {
       console.error("Error generating quiz:", error);
@@ -195,6 +197,71 @@ const NoteEditor = () => {
     } finally {
       setGeneratingQuiz(false);
     }
+  };
+
+  const loadQuiz = async () => {
+    if (!quizId) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('quizzes')
+        .select('questions')
+        .eq('id', quizId)
+        .single();
+
+      if (error) throw error;
+      
+      setQuizData(data.questions as unknown as Question[]);
+      setShowQuiz(true);
+    } catch (error) {
+      console.error("Error loading quiz:", error);
+      toast.error("Failed to load quiz");
+    }
+  };
+
+  const submitQuiz = async () => {
+    if (!quizId) return;
+    
+    const score = quizData.reduce((acc, q, idx) => {
+      return acc + (answers[idx] === q.correct_answer ? 1 : 0);
+    }, 0);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase.from('quiz_results').insert({
+        quiz_id: quizId,
+        user_id: user.id,
+        score,
+        total_questions: quizData.length,
+        answers: Object.entries(answers).map(([qIdx, aIdx]) => ({
+          question_index: parseInt(qIdx),
+          answer_index: aIdx
+        }))
+      });
+
+      if (error) throw error;
+      
+      toast.success(`Quiz completed! Score: ${score}/${quizData.length}`);
+      setShowQuiz(false);
+      setAnswers({});
+    } catch (error) {
+      console.error("Error submitting quiz:", error);
+      toast.error("Failed to submit quiz");
+    }
+  };
+
+  const exportNote = () => {
+    const content = `Title: ${title}\n\nContent:\n${textContent}\n\n${summary ? `Summary:\n${summary}` : ''}`;
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${title}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Note exported!");
   };
 
   const colors = [
@@ -226,38 +293,26 @@ const NoteEditor = () => {
           </div>
           
           <div className="flex items-center gap-2">
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={handleGenerateSummary}
-              disabled={summarizing}
-            >
-              {summarizing ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Sparkles className="w-4 h-4 mr-2" />
-              )}
+            <Button variant="outline" size="sm" onClick={exportNote}>
+              <Download className="w-4 h-4 mr-2" />
+              Export
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleGenerateSummary} disabled={summarizing}>
+              {summarizing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
               Summary
             </Button>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={handleGenerateQuiz}
-              disabled={generatingQuiz}
-            >
-              {generatingQuiz ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <FileText className="w-4 h-4 mr-2" />
-              )}
+            <Button variant="outline" size="sm" onClick={handleGenerateQuiz} disabled={generatingQuiz}>
+              {generatingQuiz ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileText className="w-4 h-4 mr-2" />}
               Quiz
             </Button>
+            {quizId && (
+              <Button variant="outline" size="sm" onClick={loadQuiz}>
+                <FileText className="w-4 h-4 mr-2" />
+                Attempt Quiz
+              </Button>
+            )}
             <Button onClick={handleSave} size="sm" className="shadow-medium" disabled={saving}>
-              {saving ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Save className="w-4 h-4 mr-2" />
-              )}
+              {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
               Save
             </Button>
           </div>
@@ -265,40 +320,20 @@ const NoteEditor = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "canvas" | "text")}>
-          <TabsList className="mb-4">
-            <TabsTrigger value="canvas">
-              <Pen className="w-4 h-4 mr-2" />
-              Canvas
-            </TabsTrigger>
-            <TabsTrigger value="text">
-              <Type className="w-4 h-4 mr-2" />
-              Text
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="canvas">
+        <div className="grid lg:grid-cols-2 gap-6">
+          {/* Canvas Section */}
+          <div>
             <div className="border-b bg-card/50 backdrop-blur-sm rounded-t-lg mb-4 p-3">
               <div className="flex items-center gap-4 flex-wrap">
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant={activeTool === "pen" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setActiveTool("pen")}
-                  >
+                  <Button variant={activeTool === "pen" ? "default" : "outline"} size="sm" onClick={() => setActiveTool("pen")}>
                     <Pen className="w-4 h-4" />
                   </Button>
-                  <Button
-                    variant={activeTool === "eraser" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setActiveTool("eraser")}
-                  >
+                  <Button variant={activeTool === "eraser" ? "default" : "outline"} size="sm" onClick={() => setActiveTool("eraser")}>
                     <Eraser className="w-4 h-4" />
                   </Button>
                 </div>
-
                 <div className="h-6 w-px bg-border" />
-
                 <div className="flex items-center gap-2">
                   <Palette className="w-4 h-4 text-muted-foreground" />
                   {colors.map((color) => (
@@ -312,54 +347,32 @@ const NoteEditor = () => {
                     />
                   ))}
                 </div>
-
                 <div className="h-6 w-px bg-border" />
-
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">Size:</span>
-                  <input
-                    type="range"
-                    min="1"
-                    max="20"
-                    value={brushSize}
-                    onChange={(e) => setBrushSize(parseInt(e.target.value))}
-                    className="w-24"
-                  />
+                  <input type="range" min="1" max="20" value={brushSize} onChange={(e) => setBrushSize(parseInt(e.target.value))} className="w-24" />
                   <span className="text-sm font-medium w-8">{brushSize}px</span>
                 </div>
               </div>
             </div>
-
             <Card className="border-0 shadow-strong overflow-hidden">
-              <div className="p-4 bg-gradient-to-b from-muted/50 to-transparent">
-                <div className="flex justify-center">
-                  <canvas 
-                    ref={canvasRef} 
-                    className="border border-border rounded-lg shadow-medium"
-                    style={{
-                      backgroundImage: `
-                        linear-gradient(rgba(0,0,0,.05) 1px, transparent 1px),
-                        linear-gradient(90deg, rgba(0,0,0,.05) 1px, transparent 1px)
-                      `,
-                      backgroundSize: '20px 20px'
-                    }}
-                  />
-                </div>
-              </div>
+              <canvas ref={canvasRef} className="w-full border rounded-lg" />
             </Card>
-          </TabsContent>
+          </div>
 
-          <TabsContent value="text">
+          {/* Text Section */}
+          <div>
+            <h3 className="text-sm font-semibold mb-3 px-1">Text Notes</h3>
             <Card className="p-4">
               <Textarea
                 value={textContent}
                 onChange={(e) => setTextContent(e.target.value)}
-                placeholder="Start typing your notes here..."
-                className="min-h-[600px] text-base"
+                placeholder="Type your notes here..."
+                className="min-h-[450px] text-base border-0 focus-visible:ring-0"
               />
             </Card>
-          </TabsContent>
-        </Tabs>
+          </div>
+        </div>
 
         {summary && (
           <Card className="mt-6 p-4 bg-accent/10 border-accent/20">
@@ -373,6 +386,38 @@ const NoteEditor = () => {
           </Card>
         )}
       </main>
+
+      <Dialog open={showQuiz} onOpenChange={setShowQuiz}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Quiz - {title}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6 pt-4">
+            {quizData.map((q, qIdx) => (
+              <div key={qIdx} className="space-y-3">
+                <h4 className="font-semibold">{qIdx + 1}. {q.question}</h4>
+                <div className="space-y-2">
+                  {q.options.map((option, oIdx) => (
+                    <label key={oIdx} className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-accent/5 transition-colors">
+                      <input
+                        type="radio"
+                        name={`q${qIdx}`}
+                        checked={answers[qIdx] === oIdx}
+                        onChange={() => setAnswers({ ...answers, [qIdx]: oIdx })}
+                        className="w-4 h-4"
+                      />
+                      <span>{option}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <Button onClick={submitQuiz} className="w-full" disabled={Object.keys(answers).length !== quizData.length}>
+              Submit Quiz
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

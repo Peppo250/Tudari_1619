@@ -11,6 +11,7 @@ import Logs from "./pages/Logs";
 import Tasks from "./pages/Tasks";
 import Productivity from "./pages/Productivity";
 import Profile from "./pages/Profile";
+import ProjectBoard from "./pages/ProjectBoard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +30,7 @@ const App = () => (
           <Route path="/notes/:id" element={<NoteEditor />} />
           <Route path="/logs" element={<Logs />} />
           <Route path="/tasks" element={<Tasks />} />
+          <Route path="/projects/:projectId" element={<ProjectBoard />} />
           <Route path="/productivity" element={<Productivity />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="*" element={<NotFound />} />
