@@ -71,7 +71,8 @@ const Notes = () => {
         .insert({
           title: "Untitled Note",
           user_id: user.id,
-          content_type: "canvas"
+          content_type: "canvas",
+          folder: null
         })
         .select()
         .single();

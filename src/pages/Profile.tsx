@@ -50,13 +50,13 @@ const Profile = () => {
         throw error;
       }
 
-      const profileData = data || { id: user.id, email: user.email, username: null, name: null };
-      setProfile(profileData);
+      const profileData = data || { id: user.id, email: user.email, username: null, name: null, free_time: [] };
+      setProfile(profileData as Profile);
       setFormData({
         username: data?.username || "",
         name: data?.name || "",
         email: data?.email || user.email || "",
-        freeTime: data?.free_time?.join(", ") || ""
+        freeTime: Array.isArray(data?.free_time) ? data.free_time.join(", ") : ""
       });
     } catch (error) {
       console.error("Error loading profile:", error);

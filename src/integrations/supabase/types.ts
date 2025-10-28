@@ -57,6 +57,7 @@ export type Database = {
         Row: {
           content_type: string | null
           created_at: string | null
+          folder: string | null
           id: string
           images: Json | null
           quiz_id: string | null
@@ -70,6 +71,7 @@ export type Database = {
         Insert: {
           content_type?: string | null
           created_at?: string | null
+          folder?: string | null
           id?: string
           images?: Json | null
           quiz_id?: string | null
@@ -83,6 +85,7 @@ export type Database = {
         Update: {
           content_type?: string | null
           created_at?: string | null
+          folder?: string | null
           id?: string
           images?: Json | null
           quiz_id?: string | null
