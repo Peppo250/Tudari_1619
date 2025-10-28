@@ -13,6 +13,7 @@ interface Profile {
   email?: string;
   name?: string;
   avatar_url?: string;
+  free_time?: string[];
 }
 
 const Profile = () => {
@@ -23,7 +24,8 @@ const Profile = () => {
   const [formData, setFormData] = useState({
     username: "",
     name: "",
-    email: ""
+    email: "",
+    freeTime: ""
   });
 
   useEffect(() => {
@@ -53,7 +55,8 @@ const Profile = () => {
       setFormData({
         username: data?.username || "",
         name: data?.name || "",
-        email: data?.email || user.email || ""
+        email: data?.email || user.email || "",
+        freeTime: data?.free_time?.join(", ") || ""
       });
     } catch (error) {
       console.error("Error loading profile:", error);
@@ -68,6 +71,11 @@ const Profile = () => {
 
     setSaving(true);
     try {
+      const freeTimeArray = formData.freeTime
+        .split(',')
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+
       const { error } = await supabase
         .from('profiles')
         .upsert({
@@ -75,6 +83,7 @@ const Profile = () => {
           username: formData.username,
           name: formData.name,
           email: formData.email,
+          free_time: freeTimeArray,
           updated_at: new Date().toISOString()
         });
 
@@ -169,6 +178,18 @@ const Profile = () => {
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Email cannot be changed
+                </p>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">Free Time Slots</label>
+                <Input
+                  value={formData.freeTime}
+                  onChange={(e) => setFormData({ ...formData, freeTime: e.target.value })}
+                  placeholder="e.g., Monday 2-4pm, Wednesday 6-8pm"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Enter your available time slots separated by commas
                 </p>
               </div>
 

@@ -3,10 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, Plus, FileText, Search, Loader2 } from "lucide-react";
+import { ArrowLeft, Plus, FileText, Search, Loader2, Trash2, FolderPlus, Folder } from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
+import { DeleteNoteDialog } from "@/components/DeleteNoteDialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 interface Note {
   id: string;
@@ -15,6 +17,7 @@ interface Note {
   updated_at: string;
   summary?: string;
   text_content?: string;
+  folder?: string;
 }
 
 const Notes = () => {
@@ -22,6 +25,12 @@ const Notes = () => {
   const [notes, setNotes] = useState<Note[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [noteToDelete, setNoteToDelete] = useState<Note | null>(null);
+  const [folderDialogOpen, setFolderDialogOpen] = useState(false);
+  const [selectedNoteForFolder, setSelectedNoteForFolder] = useState<Note | null>(null);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
 
   useEffect(() => {
     loadNotes();
@@ -77,9 +86,58 @@ const Notes = () => {
     }
   };
 
-  const filteredNotes = notes.filter(note =>
-    note.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const deleteNote = async () => {
+    if (!noteToDelete) return;
+    
+    try {
+      const { error } = await supabase
+        .from('notes')
+        .delete()
+        .eq('id', noteToDelete.id);
+
+      if (error) throw error;
+
+      toast.success("Note deleted!");
+      loadNotes();
+    } catch (error) {
+      console.error("Error deleting note:", error);
+      toast.error("Failed to delete note");
+    } finally {
+      setDeleteDialogOpen(false);
+      setNoteToDelete(null);
+    }
+  };
+
+  const handleMoveToFolder = async () => {
+    if (!selectedNoteForFolder) return;
+    
+    try {
+      const { error } = await supabase
+        .from('notes')
+        .update({ folder: newFolderName || null })
+        .eq('id', selectedNoteForFolder.id);
+
+      if (error) throw error;
+
+      toast.success(newFolderName ? `Note moved to ${newFolderName}!` : "Note removed from folder!");
+      loadNotes();
+    } catch (error) {
+      console.error("Error updating folder:", error);
+      toast.error("Failed to move note");
+    } finally {
+      setFolderDialogOpen(false);
+      setSelectedNoteForFolder(null);
+      setNewFolderName("");
+    }
+  };
+
+  const folders = Array.from(new Set(notes.map(n => n.folder).filter(Boolean))) as string[];
+
+  const filteredNotes = notes.filter(note => {
+    const matchesSearch = note.title.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesFolder = !selectedFolder || note.folder === selectedFolder;
+    return matchesSearch && matchesFolder;
+  });
 
   const container = {
     hidden: { opacity: 0 },
@@ -115,7 +173,7 @@ const Notes = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        <div className="mb-6">
+        <div className="mb-6 space-y-4">
           <div className="relative max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
             <Input
@@ -126,6 +184,29 @@ const Notes = () => {
               className="pl-10"
             />
           </div>
+
+          {folders.length > 0 && (
+            <div className="flex gap-2 flex-wrap">
+              <Button 
+                variant={selectedFolder === null ? "default" : "outline"} 
+                size="sm"
+                onClick={() => setSelectedFolder(null)}
+              >
+                All Notes
+              </Button>
+              {folders.map(folder => (
+                <Button 
+                  key={folder}
+                  variant={selectedFolder === folder ? "default" : "outline"} 
+                  size="sm"
+                  onClick={() => setSelectedFolder(folder)}
+                >
+                  <Folder className="w-3 h-3 mr-1" />
+                  {folder}
+                </Button>
+              ))}
+            </div>
+          )}
         </div>
 
         {loading ? (
@@ -155,16 +236,19 @@ const Notes = () => {
           >
             {filteredNotes.map((note) => (
               <motion.div key={note.id} variants={item}>
-                <Card 
-                  className="p-6 cursor-pointer hover:shadow-strong transition-all duration-300 group"
-                  onClick={() => navigate(`/notes/${note.id}`)}
-                >
+                <Card className="p-6 hover:shadow-strong transition-all duration-300 group">
                   <div className="flex items-start gap-3">
                     <FileText className="w-5 h-5 text-primary mt-1" />
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/notes/${note.id}`)}>
                       <h3 className="font-semibold text-lg mb-1 truncate group-hover:text-primary transition-colors">
                         {note.title}
                       </h3>
+                      {note.folder && (
+                        <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                          <Folder className="w-3 h-3" />
+                          {note.folder}
+                        </p>
+                      )}
                       <p className="text-sm text-muted-foreground">
                         Updated {new Date(note.updated_at).toLocaleDateString()}
                       </p>
@@ -174,12 +258,67 @@ const Notes = () => {
                         </p>
                       )}
                     </div>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedNoteForFolder(note);
+                          setNewFolderName(note.folder || "");
+                          setFolderDialogOpen(true);
+                        }}
+                      >
+                        <FolderPlus className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setNoteToDelete(note);
+                          setDeleteDialogOpen(true);
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                 </Card>
               </motion.div>
             ))}
           </motion.div>
         )}
+
+        <DeleteNoteDialog
+          open={deleteDialogOpen}
+          onOpenChange={setDeleteDialogOpen}
+          onConfirm={deleteNote}
+          noteTitle={noteToDelete?.title || ""}
+        />
+
+        <Dialog open={folderDialogOpen} onOpenChange={setFolderDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Move to Folder</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <Input
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                placeholder="Enter folder name or leave empty to remove from folder"
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setFolderDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleMoveToFolder}>
+                Save
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );

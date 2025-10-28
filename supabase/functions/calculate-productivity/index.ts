@@ -40,7 +40,7 @@ serve(async (req) => {
       .from('tasks')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', userId)
-      .eq('status', ['completed', 'done'])
+      .in('status', ['completed', 'done'])
       .gte('completed_at', `${date}T00:00:00`)
       .lte('completed_at', `${date}T23:59:59`);
 
@@ -81,9 +81,9 @@ serve(async (req) => {
       .single();
 
     let streak = 1;
-    if (yesterdayProd && score >= 1) {
+    if (yesterdayProd && score > 10) {
       streak = yesterdayProd.streak + 1;
-    } else if (score < 1) {
+    } else if (score <= 10) {
       streak = 0;
     }
 

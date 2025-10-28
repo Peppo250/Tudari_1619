@@ -87,7 +87,7 @@ const NoteEditor = () => {
   };
 
   useEffect(() => {
-    if (!canvasRef.current || fabricCanvas) return;
+    if (!canvasRef.current) return;
 
     const canvas = new FabricCanvas(canvasRef.current, {
       width: 800,
@@ -106,7 +106,7 @@ const NoteEditor = () => {
     return () => {
       canvas.dispose();
     };
-  }, [brushColor, brushSize, fabricCanvas]);
+  }, []);
 
   useEffect(() => {
     if (!fabricCanvas) return;
