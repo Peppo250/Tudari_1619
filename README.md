@@ -19,7 +19,7 @@ A comprehensive productivity and learning management application built with mode
 - **Sonner** - Toast notifications
 - **Lucide React** - Icon library
 
-### Backend (Lovable Cloud / Supabase)
+### Backend (Supabase)
 - **PostgreSQL** - Relational database
 - **Row Level Security (RLS)** - Data access control
 - **Edge Functions** - Serverless backend logic
@@ -27,7 +27,6 @@ A comprehensive productivity and learning management application built with mode
 - **Real-time subscriptions** - Live data updates
 
 ### AI Integration
-- **Lovable AI Gateway** - AI model access without API keys
 - Supported Models:
   - `google/gemini-2.5-pro` - Advanced reasoning and multimodal tasks
   - `google/gemini-2.5-flash` - Balanced performance
@@ -157,7 +156,6 @@ All tables have RLS policies ensuring users can only access their own data:
 - Actions:
   - `summarize`: Generate AI summary of note content
   - `generate-quiz`: Create quiz questions from note
-- Uses Lovable AI Gateway
 - Returns processed data to frontend
 
 ## 🎨 Design System
@@ -271,7 +269,7 @@ npm run dev
 The application will be available at `http://localhost:5173`
 
 ### Environment Variables
-All environment variables are automatically configured through Lovable Cloud:
+All environment variables are automatically configured through Cloud:
 - `VITE_SUPABASE_URL` - Supabase project URL
 - `VITE_SUPABASE_PUBLISHABLE_KEY` - Supabase anonymous key
 - `VITE_SUPABASE_PROJECT_ID` - Project identifier
@@ -368,18 +366,10 @@ The application is fully responsive and works across:
 - Streak management
 - Historical data tracking
 
-## 📄 License
-
-This project is built with Lovable and uses the MIT License.
 
 ## 🤝 Contributing
 
 This is a personal productivity project. For suggestions or issues, please open an issue in the repository.
 
-## 📞 Support
-
-For support with Lovable features, visit [docs.lovable.dev](https://docs.lovable.dev)
-
----
 
 Built with ❤️ using Lovable, React, and Supabase
