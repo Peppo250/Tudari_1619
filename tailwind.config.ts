@@ -40,6 +40,16 @@ export default {
           DEFAULT: "hsl(var(--accent))",
           foreground: "hsl(var(--accent-foreground))",
         },
+        pine: {
+          DEFAULT: "hsl(var(--pine))",
+          foreground: "hsl(var(--pine-foreground))",
+          light: "hsl(var(--pine-light))",
+        },
+        amber: {
+          DEFAULT: "hsl(var(--amber))",
+          foreground: "hsl(var(--amber-foreground))",
+          light: "hsl(var(--amber-light))",
+        },
         success: {
           DEFAULT: "hsl(var(--success))",
           foreground: "hsl(var(--success-foreground))",
@@ -68,6 +78,8 @@ export default {
         'gradient-warm': 'var(--gradient-warm)',
         'gradient-hero': 'var(--gradient-hero)',
         'gradient-subtle': 'var(--gradient-subtle)',
+        'gradient-pine': 'var(--gradient-pine)',
+        'gradient-amber': 'var(--gradient-amber)',
       },
       boxShadow: {
         'soft': 'var(--shadow-soft)',

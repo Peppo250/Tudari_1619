@@ -34,6 +34,16 @@ All colors MUST be HSL.
     --accent: 180 65% 45%;
     --accent-foreground: 0 0% 100%;
 
+    /* Pine green */
+    --pine: 160 50% 35%;
+    --pine-foreground: 0 0% 100%;
+    --pine-light: 160 40% 92%;
+
+    /* Warm amber */
+    --amber: 38 90% 55%;
+    --amber-foreground: 222 47% 11%;
+    --amber-light: 38 80% 95%;
+
     /* Success green */
     --success: 142 76% 45%;
     --success-foreground: 0 0% 100%;
@@ -51,7 +61,9 @@ All colors MUST be HSL.
     --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%) 0%, hsl(217 91% 70%) 100%);
     --gradient-warm: linear-gradient(135deg, hsl(38 80% 75%) 0%, hsl(30 70% 85%) 100%);
     --gradient-hero: linear-gradient(135deg, hsl(217 91% 60%) 0%, hsl(180 65% 45%) 100%);
-    --gradient-subtle: linear-gradient(180deg, hsl(40 20% 97%) 0%, hsl(40 30% 95%) 100%);
+    --gradient-subtle: linear-gradient(180deg, hsl(160 40% 98%) 0%, hsl(40 30% 96%) 100%);
+    --gradient-pine: linear-gradient(135deg, hsl(160 50% 35%) 0%, hsl(160 45% 45%) 100%);
+    --gradient-amber: linear-gradient(135deg, hsl(38 90% 55%) 0%, hsl(38 85% 65%) 100%);
 
     /* Shadows */
     --shadow-soft: 0 2px 8px -2px hsl(217 91% 60% / 0.1);
@@ -96,6 +108,14 @@ All colors MUST be HSL.
     --accent: 180 65% 50%;
     --accent-foreground: 0 0% 100%;
 
+    --pine: 160 50% 40%;
+    --pine-foreground: 0 0% 100%;
+    --pine-light: 160 40% 20%;
+
+    --amber: 38 90% 60%;
+    --amber-foreground: 222 47% 11%;
+    --amber-light: 38 60% 25%;
+
     --success: 142 76% 50%;
     --success-foreground: 0 0% 100%;
 
@@ -110,6 +130,8 @@ All colors MUST be HSL.
     --gradient-warm: linear-gradient(135deg, hsl(38 60% 35%) 0%, hsl(30 50% 40%) 100%);
     --gradient-hero: linear-gradient(135deg, hsl(217 91% 50%) 0%, hsl(180 65% 40%) 100%);
     --gradient-subtle: linear-gradient(180deg, hsl(222 47% 11%) 0%, hsl(222 47% 15%) 100%);
+    --gradient-pine: linear-gradient(135deg, hsl(160 50% 30%) 0%, hsl(160 45% 40%) 100%);
+    --gradient-amber: linear-gradient(135deg, hsl(38 90% 50%) 0%, hsl(38 85% 60%) 100%);
 
     --shadow-soft: 0 2px 8px -2px hsl(0 0% 0% / 0.3);
     --shadow-medium: 0 4px 16px -4px hsl(0 0% 0% / 0.4);

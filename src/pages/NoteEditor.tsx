@@ -3,7 +3,6 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Canvas as FabricCanvas, PencilBrush } from "fabric";
 import { 
   ArrowLeft, 
   Save, 
@@ -13,7 +12,9 @@ import {
   Sparkles,
   FileText,
   Loader2,
-  Download
+  Download,
+  Highlighter,
+  Image as ImageIcon
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
@@ -26,14 +27,22 @@ interface Question {
   correct_answer: number;
 }
 
+interface Stroke {
+  tool: string;
+  color: string;
+  size: number;
+  points: { x: number; y: number }[];
+}
+
 const NoteEditor = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [fabricCanvas, setFabricCanvas] = useState<FabricCanvas | null>(null);
+  const [ctx, setCtx] = useState<CanvasRenderingContext2D | null>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
   const [title, setTitle] = useState("Untitled Note");
   const [textContent, setTextContent] = useState("");
-  const [activeTool, setActiveTool] = useState<"pen" | "eraser">("pen");
+  const [activeTool, setActiveTool] = useState<"pen" | "pencil" | "eraser" | "highlighter">("pen");
   const [brushColor, setBrushColor] = useState("#3b82f6");
   const [brushSize, setBrushSize] = useState(2);
   const [loading, setLoading] = useState(true);
@@ -45,6 +54,8 @@ const NoteEditor = () => {
   const [showQuiz, setShowQuiz] = useState(false);
   const [quizData, setQuizData] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Record<number, number>>({});
+  const [strokes, setStrokes] = useState<Stroke[]>([]);
+  const [currentStroke, setCurrentStroke] = useState<Stroke | null>(null);
 
   useEffect(() => {
     loadNote();
@@ -76,6 +87,9 @@ const NoteEditor = () => {
           setTextContent(note.text_content || "");
           setSummary(note.summary || "");
           setQuizId(note.quiz_id);
+          if (note.strokes && Array.isArray(note.strokes)) {
+            setStrokes(note.strokes as unknown as Stroke[]);
+          }
         }
       }
     } catch (error) {
@@ -89,55 +103,167 @@ const NoteEditor = () => {
   useEffect(() => {
     if (!canvasRef.current) return;
 
-    const canvas = new FabricCanvas(canvasRef.current, {
-      width: 800,
-      height: 400,
-      backgroundColor: "#ffffff",
-      isDrawingMode: true,
-    });
+    const canvas = canvasRef.current;
+    canvas.width = 800;
+    canvas.height = 500;
+    const context = canvas.getContext("2d");
+    if (!context) return;
 
-    const brush = new PencilBrush(canvas);
-    brush.color = brushColor;
-    brush.width = brushSize;
-    canvas.freeDrawingBrush = brush;
-
-    setFabricCanvas(canvas);
-
-    return () => {
-      canvas.dispose();
-    };
+    setCtx(context);
+    drawGrid(context);
+    redrawCanvas(context);
   }, []);
 
   useEffect(() => {
-    if (!fabricCanvas) return;
-
-    fabricCanvas.isDrawingMode = true;
-    const brush = new PencilBrush(fabricCanvas);
-    
-    if (activeTool === "eraser") {
-      brush.color = "#ffffff";
-      brush.width = brushSize * 3;
-    } else {
-      brush.color = brushColor;
-      brush.width = brushSize;
+    if (ctx) {
+      redrawCanvas(ctx);
     }
+  }, [strokes, ctx]);
+
+  const drawGrid = (context: CanvasRenderingContext2D) => {
+    const gridSize = 20;
+    context.strokeStyle = "#f0f0f0";
+    context.lineWidth = 0.5;
+
+    for (let x = 0; x <= 800; x += gridSize) {
+      context.beginPath();
+      context.moveTo(x, 0);
+      context.lineTo(x, 500);
+      context.stroke();
+    }
+
+    for (let y = 0; y <= 500; y += gridSize) {
+      context.beginPath();
+      context.moveTo(0, y);
+      context.lineTo(800, y);
+      context.stroke();
+    }
+  };
+
+  const redrawCanvas = (context: CanvasRenderingContext2D) => {
+    context.clearRect(0, 0, 800, 500);
+    drawGrid(context);
+
+    strokes.forEach((stroke) => {
+      drawStroke(context, stroke);
+    });
+
+    if (currentStroke) {
+      drawStroke(context, currentStroke);
+    }
+  };
+
+  const drawStroke = (context: CanvasRenderingContext2D, stroke: Stroke) => {
+    if (stroke.points.length < 2) return;
+
+    context.beginPath();
+    context.strokeStyle = stroke.tool === "eraser" ? "#ffffff" : stroke.color;
+    context.lineWidth = stroke.size;
+    context.lineCap = "round";
+    context.lineJoin = "round";
+
+    if (stroke.tool === "highlighter") {
+      context.globalAlpha = 0.3;
+      context.lineWidth = stroke.size * 3;
+    } else {
+      context.globalAlpha = 1;
+    }
+
+    context.moveTo(stroke.points[0].x, stroke.points[0].y);
+
+    for (let i = 1; i < stroke.points.length; i++) {
+      context.lineTo(stroke.points[i].x, stroke.points[i].y);
+    }
+
+    context.stroke();
+    context.globalAlpha = 1;
+  };
+
+  const getMousePos = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    };
+  };
+
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    setIsDrawing(true);
+    const pos = getMousePos(e);
     
-    fabricCanvas.freeDrawingBrush = brush;
-  }, [activeTool, brushColor, brushSize, fabricCanvas]);
+    const newStroke: Stroke = {
+      tool: activeTool,
+      color: brushColor,
+      size: activeTool === "highlighter" ? brushSize * 2 : activeTool === "eraser" ? brushSize * 3 : brushSize,
+      points: [pos],
+    };
+    
+    setCurrentStroke(newStroke);
+  };
+
+  const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDrawing || !currentStroke || !ctx) return;
+
+    const pos = getMousePos(e);
+    const updatedStroke = {
+      ...currentStroke,
+      points: [...currentStroke.points, pos],
+    };
+
+    setCurrentStroke(updatedStroke);
+    redrawCanvas(ctx);
+  };
+
+  const stopDrawing = () => {
+    if (currentStroke && currentStroke.points.length > 1) {
+      setStrokes([...strokes, currentStroke]);
+    }
+    setCurrentStroke(null);
+    setIsDrawing(false);
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        if (ctx && canvasRef.current) {
+          const scale = Math.min(
+            canvasRef.current.width / img.width,
+            canvasRef.current.height / img.height,
+            1
+          );
+          const width = img.width * scale;
+          const height = img.height * scale;
+          const x = (canvasRef.current.width - width) / 2;
+          const y = (canvasRef.current.height - height) / 2;
+
+          ctx.drawImage(img, x, y, width, height);
+          toast.success("Image imported!");
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleSave = async () => {
     if (!id) return;
     
     setSaving(true);
     try {
-      const canvasData = fabricCanvas ? fabricCanvas.toJSON() : null;
-      
       const { error } = await supabase
         .from('notes')
         .update({
           title,
           text_content: textContent,
-          strokes: canvasData ? canvasData.objects : [],
+          strokes: strokes as unknown as any,
           updated_at: new Date().toISOString()
         })
         .eq('id', id);
@@ -189,7 +315,8 @@ const NoteEditor = () => {
       
       if (data.quizId) {
         setQuizId(data.quizId);
-        toast.success("Quiz generated!");
+        toast.success("Quiz generated! Click 'Attempt Quiz' to start.");
+        await loadQuiz(data.quizId);
       }
     } catch (error) {
       console.error("Error generating quiz:", error);
@@ -199,14 +326,15 @@ const NoteEditor = () => {
     }
   };
 
-  const loadQuiz = async () => {
-    if (!quizId) return;
+  const loadQuiz = async (qId?: string) => {
+    const quizIdToLoad = qId || quizId;
+    if (!quizIdToLoad) return;
     
     try {
       const { data, error } = await supabase
         .from('quizzes')
         .select('questions')
-        .eq('id', quizId)
+        .eq('id', quizIdToLoad)
         .single();
 
       if (error) throw error;
@@ -306,7 +434,7 @@ const NoteEditor = () => {
               Quiz
             </Button>
             {quizId && (
-              <Button variant="outline" size="sm" onClick={loadQuiz}>
+              <Button variant="outline" size="sm" onClick={() => loadQuiz()}>
                 <FileText className="w-4 h-4 mr-2" />
                 Attempt Quiz
               </Button>
@@ -323,11 +451,17 @@ const NoteEditor = () => {
         <div className="grid lg:grid-cols-2 gap-6">
           {/* Canvas Section */}
           <div>
-            <div className="border-b bg-card/50 backdrop-blur-sm rounded-t-lg mb-4 p-3">
+            <div className="border-b bg-pine-light/50 backdrop-blur-sm rounded-t-lg mb-4 p-3">
               <div className="flex items-center gap-4 flex-wrap">
                 <div className="flex items-center gap-2">
                   <Button variant={activeTool === "pen" ? "default" : "outline"} size="sm" onClick={() => setActiveTool("pen")}>
                     <Pen className="w-4 h-4" />
+                  </Button>
+                  <Button variant={activeTool === "pencil" ? "default" : "outline"} size="sm" onClick={() => setActiveTool("pencil")}>
+                    <Pen className="w-4 h-4" />
+                  </Button>
+                  <Button variant={activeTool === "highlighter" ? "default" : "outline"} size="sm" onClick={() => setActiveTool("highlighter")}>
+                    <Highlighter className="w-4 h-4" />
                   </Button>
                   <Button variant={activeTool === "eraser" ? "default" : "outline"} size="sm" onClick={() => setActiveTool("eraser")}>
                     <Eraser className="w-4 h-4" />
@@ -353,31 +487,48 @@ const NoteEditor = () => {
                   <input type="range" min="1" max="20" value={brushSize} onChange={(e) => setBrushSize(parseInt(e.target.value))} className="w-24" />
                   <span className="text-sm font-medium w-8">{brushSize}px</span>
                 </div>
+                <div className="h-6 w-px bg-border" />
+                <label className="cursor-pointer">
+                  <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                  <Button variant="outline" size="sm" asChild>
+                    <span>
+                      <ImageIcon className="w-4 h-4 mr-2" />
+                      Import
+                    </span>
+                  </Button>
+                </label>
               </div>
             </div>
-            <Card className="border-0 shadow-strong overflow-hidden">
-              <canvas ref={canvasRef} className="w-full border rounded-lg" />
+            <Card className="border-0 shadow-strong overflow-hidden bg-amber-light/20">
+              <canvas 
+                ref={canvasRef} 
+                className="w-full border rounded-lg cursor-crosshair bg-white"
+                onMouseDown={startDrawing}
+                onMouseMove={draw}
+                onMouseUp={stopDrawing}
+                onMouseLeave={stopDrawing}
+              />
             </Card>
           </div>
 
           {/* Text Section */}
           <div>
             <h3 className="text-sm font-semibold mb-3 px-1">Text Notes</h3>
-            <Card className="p-4">
+            <Card className="p-4 bg-pine-light/20">
               <Textarea
                 value={textContent}
                 onChange={(e) => setTextContent(e.target.value)}
                 placeholder="Type your notes here..."
-                className="min-h-[450px] text-base border-0 focus-visible:ring-0"
+                className="min-h-[450px] text-base border-0 focus-visible:ring-0 bg-transparent"
               />
             </Card>
           </div>
         </div>
 
         {summary && (
-          <Card className="mt-6 p-4 bg-accent/10 border-accent/20">
+          <Card className="mt-6 p-4 bg-amber-light/30 border-amber/20">
             <div className="flex items-start gap-3">
-              <Sparkles className="w-5 h-5 text-accent mt-0.5" />
+              <Sparkles className="w-5 h-5 text-amber mt-0.5" />
               <div className="flex-1">
                 <h3 className="font-semibold mb-2">AI Summary</h3>
                 <p className="text-sm">{summary}</p>
