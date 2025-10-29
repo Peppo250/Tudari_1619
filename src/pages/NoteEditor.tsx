@@ -126,13 +126,14 @@ const NoteEditor = () => {
       fabricCanvas.selection = true;
     } else if (activeTool === "pen" || activeTool === "highlighter" || activeTool === "eraser") {
       fabricCanvas.isDrawingMode = true;
-      fabricCanvas.freeDrawingBrush.color = activeTool === "eraser" ? "#ffffff" : brushColor;
+      // Use semi-transparent color for highlighter instead of opacity property
+      const color = activeTool === "eraser" 
+        ? "#ffffff" 
+        : activeTool === "highlighter" 
+          ? brushColor + "4D" // Add alpha channel for transparency
+          : brushColor;
+      fabricCanvas.freeDrawingBrush.color = color;
       fabricCanvas.freeDrawingBrush.width = activeTool === "highlighter" ? brushSize * 3 : activeTool === "eraser" ? brushSize * 3 : brushSize;
-      if (activeTool === "highlighter") {
-        fabricCanvas.freeDrawingBrush.opacity = 0.3;
-      } else {
-        fabricCanvas.freeDrawingBrush.opacity = 1;
-      }
     } else if (activeTool === "rectangle") {
       const rect = new Rect({
         left: 100,
@@ -435,7 +436,7 @@ const NoteEditor = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        <div className="grid lg:grid-cols-2 gap-6">
+        <div className="space-y-6">
           {/* Canvas Section */}
           <div>
             <div className="border-b bg-pine-light/50 backdrop-blur-sm rounded-t-lg mb-4 p-3">
@@ -514,7 +515,7 @@ const NoteEditor = () => {
                 value={textContent}
                 onChange={(e) => setTextContent(e.target.value)}
                 placeholder="Type your notes here..."
-                className="min-h-[550px] text-base border-0 focus-visible:ring-0 bg-transparent"
+                className="min-h-[300px] text-base border-0 focus-visible:ring-0 bg-transparent"
               />
             </Card>
           </div>
