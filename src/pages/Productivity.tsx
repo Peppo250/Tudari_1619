@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { ArrowLeft, TrendingUp, Award, Flame, Target, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface Productivity {
   score: number;
@@ -27,6 +28,7 @@ interface Reward {
 const Productivity = () => {
   const navigate = useNavigate();
   const [productivity, setProductivity] = useState<Productivity | null>(null);
+  const [weekData, setWeekData] = useState<Productivity[]>([]);
   const [rewards, setRewards] = useState<Reward[]>([]);
   const [loading, setLoading] = useState(true);
   const [calculating, setCalculating] = useState(false);
@@ -57,6 +59,22 @@ const Productivity = () => {
       }
 
       setProductivity(prodData);
+
+      // Load last 7 days productivity data
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+      const startDate = sevenDaysAgo.toISOString().split('T')[0];
+      
+      const { data: weekProdData, error: weekError } = await supabase
+        .from('productivity')
+        .select('*')
+        .eq('user_id', user.id)
+        .gte('date', startDate)
+        .lte('date', today)
+        .order('date', { ascending: true });
+
+      if (weekError) throw weekError;
+      setWeekData(weekProdData || []);
 
       // Load rewards
       const { data: rewardsData, error: rewardsError } = await supabase
@@ -167,6 +185,39 @@ const Productivity = () => {
                 <p className="text-sm text-muted-foreground">Study notes</p>
               </Card>
             </div>
+
+            {/* Productivity Chart */}
+            <Card className="p-6">
+              <h2 className="text-xl font-bold mb-4">Productivity Trend (Last 7 Days)</h2>
+              {weekData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={weekData}>
+                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                    <XAxis 
+                      dataKey="date" 
+                      tickFormatter={(date) => new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    />
+                    <YAxis />
+                    <Tooltip 
+                      labelFormatter={(date) => new Date(date).toLocaleDateString()}
+                      formatter={(value: number) => [value, 'Score']}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="score" 
+                      stroke="hsl(var(--primary))" 
+                      strokeWidth={2}
+                      dot={{ fill: 'hsl(var(--primary))', r: 4 }}
+                      activeDot={{ r: 6 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                  <p>No productivity data available for the past week</p>
+                </div>
+              )}
+            </Card>
 
             {/* Rewards Section */}
             <div>

@@ -14,12 +14,18 @@ import {
   Loader2,
   Download,
   Highlighter,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Square,
+  Circle as CircleIcon,
+  ZoomIn,
+  ZoomOut
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Canvas as FabricCanvas, PencilBrush, Circle, Rect, FabricImage } from "fabric";
+import jsPDF from "jspdf";
 
 interface Question {
   question: string;
@@ -27,22 +33,15 @@ interface Question {
   correct_answer: number;
 }
 
-interface Stroke {
-  tool: string;
-  color: string;
-  size: number;
-  points: { x: number; y: number }[];
-}
-
 const NoteEditor = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [ctx, setCtx] = useState<CanvasRenderingContext2D | null>(null);
-  const [isDrawing, setIsDrawing] = useState(false);
+  const textSectionRef = useRef<HTMLDivElement>(null);
+  const [fabricCanvas, setFabricCanvas] = useState<FabricCanvas | null>(null);
   const [title, setTitle] = useState("Untitled Note");
   const [textContent, setTextContent] = useState("");
-  const [activeTool, setActiveTool] = useState<"pen" | "pencil" | "eraser" | "highlighter">("pen");
+  const [activeTool, setActiveTool] = useState<"select" | "pen" | "highlighter" | "eraser" | "rectangle" | "circle">("select");
   const [brushColor, setBrushColor] = useState("#3b82f6");
   const [brushSize, setBrushSize] = useState(2);
   const [loading, setLoading] = useState(true);
@@ -54,8 +53,6 @@ const NoteEditor = () => {
   const [showQuiz, setShowQuiz] = useState(false);
   const [quizData, setQuizData] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Record<number, number>>({});
-  const [strokes, setStrokes] = useState<Stroke[]>([]);
-  const [currentStroke, setCurrentStroke] = useState<Stroke | null>(null);
 
   useEffect(() => {
     loadNote();
@@ -87,9 +84,6 @@ const NoteEditor = () => {
           setTextContent(note.text_content || "");
           setSummary(note.summary || "");
           setQuizId(note.quiz_id);
-          if (note.strokes && Array.isArray(note.strokes)) {
-            setStrokes(note.strokes as unknown as Stroke[]);
-          }
         }
       }
     } catch (error) {
@@ -103,167 +97,111 @@ const NoteEditor = () => {
   useEffect(() => {
     if (!canvasRef.current) return;
 
-    const canvas = canvasRef.current;
-    canvas.width = 800;
-    canvas.height = 500;
-    const context = canvas.getContext("2d");
-    if (!context) return;
+    const canvas = new FabricCanvas(canvasRef.current, {
+      width: 800,
+      height: 600,
+      backgroundColor: "#ffffff",
+    });
 
-    setCtx(context);
-    drawGrid(context);
-    redrawCanvas(context);
+    // Initialize drawing brush
+    canvas.freeDrawingBrush = new PencilBrush(canvas);
+    canvas.freeDrawingBrush.color = brushColor;
+    canvas.freeDrawingBrush.width = brushSize;
+
+    setFabricCanvas(canvas);
+    toast.success("Canvas ready!");
+
+    return () => {
+      canvas.dispose();
+    };
   }, []);
 
   useEffect(() => {
-    if (ctx) {
-      redrawCanvas(ctx);
-    }
-  }, [strokes, ctx]);
+    if (!fabricCanvas) return;
 
-  const drawGrid = (context: CanvasRenderingContext2D) => {
-    const gridSize = 20;
-    context.strokeStyle = "#f0f0f0";
-    context.lineWidth = 0.5;
+    // Reset drawing mode
+    fabricCanvas.isDrawingMode = false;
 
-    for (let x = 0; x <= 800; x += gridSize) {
-      context.beginPath();
-      context.moveTo(x, 0);
-      context.lineTo(x, 500);
-      context.stroke();
+    if (activeTool === "select") {
+      fabricCanvas.selection = true;
+    } else if (activeTool === "pen" || activeTool === "highlighter" || activeTool === "eraser") {
+      fabricCanvas.isDrawingMode = true;
+      fabricCanvas.freeDrawingBrush.color = activeTool === "eraser" ? "#ffffff" : brushColor;
+      fabricCanvas.freeDrawingBrush.width = activeTool === "highlighter" ? brushSize * 3 : activeTool === "eraser" ? brushSize * 3 : brushSize;
+      if (activeTool === "highlighter") {
+        fabricCanvas.freeDrawingBrush.opacity = 0.3;
+      } else {
+        fabricCanvas.freeDrawingBrush.opacity = 1;
+      }
+    } else if (activeTool === "rectangle") {
+      const rect = new Rect({
+        left: 100,
+        top: 100,
+        fill: brushColor,
+        width: 100,
+        height: 100,
+        stroke: brushColor,
+        strokeWidth: 2
+      });
+      fabricCanvas.add(rect);
+      fabricCanvas.setActiveObject(rect);
+      setActiveTool("select");
+    } else if (activeTool === "circle") {
+      const circle = new Circle({
+        left: 100,
+        top: 100,
+        fill: brushColor,
+        radius: 50,
+        stroke: brushColor,
+        strokeWidth: 2
+      });
+      fabricCanvas.add(circle);
+      fabricCanvas.setActiveObject(circle);
+      setActiveTool("select");
     }
+  }, [activeTool, brushColor, brushSize, fabricCanvas]);
 
-    for (let y = 0; y <= 500; y += gridSize) {
-      context.beginPath();
-      context.moveTo(0, y);
-      context.lineTo(800, y);
-      context.stroke();
-    }
+  const handleZoomIn = () => {
+    if (!fabricCanvas) return;
+    const zoom = fabricCanvas.getZoom();
+    fabricCanvas.setZoom(zoom * 1.1);
   };
 
-  const redrawCanvas = (context: CanvasRenderingContext2D) => {
-    context.clearRect(0, 0, 800, 500);
-    drawGrid(context);
-
-    strokes.forEach((stroke) => {
-      drawStroke(context, stroke);
-    });
-
-    if (currentStroke) {
-      drawStroke(context, currentStroke);
-    }
-  };
-
-  const drawStroke = (context: CanvasRenderingContext2D, stroke: Stroke) => {
-    if (stroke.points.length < 2) return;
-
-    context.beginPath();
-    context.strokeStyle = stroke.tool === "eraser" ? "#ffffff" : stroke.color;
-    context.lineWidth = stroke.size;
-    context.lineCap = "round";
-    context.lineJoin = "round";
-
-    if (stroke.tool === "highlighter") {
-      context.globalAlpha = 0.3;
-      context.lineWidth = stroke.size * 3;
-    } else {
-      context.globalAlpha = 1;
-    }
-
-    context.moveTo(stroke.points[0].x, stroke.points[0].y);
-
-    for (let i = 1; i < stroke.points.length; i++) {
-      context.lineTo(stroke.points[i].x, stroke.points[i].y);
-    }
-
-    context.stroke();
-    context.globalAlpha = 1;
-  };
-
-  const getMousePos = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
-
-    const rect = canvas.getBoundingClientRect();
-    return {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
-    };
-  };
-
-  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    setIsDrawing(true);
-    const pos = getMousePos(e);
-    
-    const newStroke: Stroke = {
-      tool: activeTool,
-      color: brushColor,
-      size: activeTool === "highlighter" ? brushSize * 2 : activeTool === "eraser" ? brushSize * 3 : brushSize,
-      points: [pos],
-    };
-    
-    setCurrentStroke(newStroke);
-  };
-
-  const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || !currentStroke || !ctx) return;
-
-    const pos = getMousePos(e);
-    const updatedStroke = {
-      ...currentStroke,
-      points: [...currentStroke.points, pos],
-    };
-
-    setCurrentStroke(updatedStroke);
-    redrawCanvas(ctx);
-  };
-
-  const stopDrawing = () => {
-    if (currentStroke && currentStroke.points.length > 1) {
-      setStrokes([...strokes, currentStroke]);
-    }
-    setCurrentStroke(null);
-    setIsDrawing(false);
+  const handleZoomOut = () => {
+    if (!fabricCanvas) return;
+    const zoom = fabricCanvas.getZoom();
+    fabricCanvas.setZoom(zoom / 1.1);
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !fabricCanvas) return;
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        if (ctx && canvasRef.current) {
-          const scale = Math.min(
-            canvasRef.current.width / img.width,
-            canvasRef.current.height / img.height,
-            1
-          );
-          const width = img.width * scale;
-          const height = img.height * scale;
-          const x = (canvasRef.current.width - width) / 2;
-          const y = (canvasRef.current.height - height) / 2;
-
-          ctx.drawImage(img, x, y, width, height);
-          toast.success("Image imported!");
-        }
-      };
-      img.src = event.target?.result as string;
+      const imgUrl = event.target?.result as string;
+      FabricImage.fromURL(imgUrl).then((img) => {
+        img.scaleToWidth(200);
+        fabricCanvas.add(img);
+        toast.success("Image imported!");
+      });
     };
     reader.readAsDataURL(file);
   };
 
   const handleSave = async () => {
-    if (!id) return;
+    if (!id || !fabricCanvas) return;
     
     setSaving(true);
     try {
+      const canvasJSON = fabricCanvas.toJSON();
+      
       const { error } = await supabase
         .from('notes')
         .update({
           title,
           text_content: textContent,
-          strokes: strokes as unknown as any,
+          strokes: canvasJSON as any,
           updated_at: new Date().toISOString()
         })
         .eq('id', id);
@@ -380,16 +318,65 @@ const NoteEditor = () => {
     }
   };
 
-  const exportNote = () => {
-    const content = `Title: ${title}\n\nContent:\n${textContent}\n\n${summary ? `Summary:\n${summary}` : ''}`;
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${title}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("Note exported!");
+  const exportToPDF = async () => {
+    if (!fabricCanvas || !textSectionRef.current) return;
+
+    try {
+      toast.info("Generating PDF...");
+      
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      
+      // Title
+      pdf.setFontSize(20);
+      pdf.text(title, pageWidth / 2, 20, { align: 'center' });
+      
+      let yOffset = 35;
+      
+      // Canvas
+      const canvasDataURL = fabricCanvas.toDataURL({ format: 'png', multiplier: 1 });
+      const canvasAspectRatio = 800 / 600;
+      const canvasWidth = pageWidth - 20;
+      const canvasHeight = canvasWidth / canvasAspectRatio;
+      pdf.addImage(canvasDataURL, 'PNG', 10, yOffset, canvasWidth, canvasHeight);
+      yOffset += canvasHeight + 10;
+      
+      // Text content
+      if (textContent) {
+        if (yOffset + 30 > pageHeight) {
+          pdf.addPage();
+          yOffset = 20;
+        }
+        pdf.setFontSize(14);
+        pdf.text("Notes:", 10, yOffset);
+        yOffset += 7;
+        pdf.setFontSize(11);
+        const textLines = pdf.splitTextToSize(textContent, pageWidth - 20);
+        pdf.text(textLines, 10, yOffset);
+        yOffset += textLines.length * 5 + 10;
+      }
+      
+      // Summary
+      if (summary) {
+        if (yOffset + 30 > pageHeight) {
+          pdf.addPage();
+          yOffset = 20;
+        }
+        pdf.setFontSize(14);
+        pdf.text("AI Summary:", 10, yOffset);
+        yOffset += 7;
+        pdf.setFontSize(11);
+        const summaryLines = pdf.splitTextToSize(summary, pageWidth - 20);
+        pdf.text(summaryLines, 10, yOffset);
+      }
+      
+      pdf.save(`${title}.pdf`);
+      toast.success("PDF exported!");
+    } catch (error) {
+      console.error("Error exporting PDF:", error);
+      toast.error("Failed to export PDF");
+    }
   };
 
   const colors = [
@@ -421,9 +408,9 @@ const NoteEditor = () => {
           </div>
           
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={exportNote}>
+            <Button variant="outline" size="sm" onClick={exportToPDF}>
               <Download className="w-4 h-4 mr-2" />
-              Export
+              PDF
             </Button>
             <Button variant="outline" size="sm" onClick={handleGenerateSummary} disabled={summarizing}>
               {summarizing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
@@ -457,14 +444,17 @@ const NoteEditor = () => {
                   <Button variant={activeTool === "pen" ? "default" : "outline"} size="sm" onClick={() => setActiveTool("pen")}>
                     <Pen className="w-4 h-4" />
                   </Button>
-                  <Button variant={activeTool === "pencil" ? "default" : "outline"} size="sm" onClick={() => setActiveTool("pencil")}>
-                    <Pen className="w-4 h-4" />
-                  </Button>
                   <Button variant={activeTool === "highlighter" ? "default" : "outline"} size="sm" onClick={() => setActiveTool("highlighter")}>
                     <Highlighter className="w-4 h-4" />
                   </Button>
                   <Button variant={activeTool === "eraser" ? "default" : "outline"} size="sm" onClick={() => setActiveTool("eraser")}>
                     <Eraser className="w-4 h-4" />
+                  </Button>
+                  <Button variant={activeTool === "rectangle" ? "default" : "outline"} size="sm" onClick={() => setActiveTool("rectangle")}>
+                    <Square className="w-4 h-4" />
+                  </Button>
+                  <Button variant={activeTool === "circle" ? "default" : "outline"} size="sm" onClick={() => setActiveTool("circle")}>
+                    <CircleIcon className="w-4 h-4" />
                   </Button>
                 </div>
                 <div className="h-6 w-px bg-border" />
@@ -488,6 +478,15 @@ const NoteEditor = () => {
                   <span className="text-sm font-medium w-8">{brushSize}px</span>
                 </div>
                 <div className="h-6 w-px bg-border" />
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={handleZoomIn}>
+                    <ZoomIn className="w-4 h-4" />
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleZoomOut}>
+                    <ZoomOut className="w-4 h-4" />
+                  </Button>
+                </div>
+                <div className="h-6 w-px bg-border" />
                 <label className="cursor-pointer">
                   <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
                   <Button variant="outline" size="sm" asChild>
@@ -502,24 +501,20 @@ const NoteEditor = () => {
             <Card className="border-0 shadow-strong overflow-hidden bg-amber-light/20">
               <canvas 
                 ref={canvasRef} 
-                className="w-full border rounded-lg cursor-crosshair bg-white"
-                onMouseDown={startDrawing}
-                onMouseMove={draw}
-                onMouseUp={stopDrawing}
-                onMouseLeave={stopDrawing}
+                className="w-full border rounded-lg"
               />
             </Card>
           </div>
 
           {/* Text Section */}
-          <div>
+          <div ref={textSectionRef}>
             <h3 className="text-sm font-semibold mb-3 px-1">Text Notes</h3>
             <Card className="p-4 bg-pine-light/20">
               <Textarea
                 value={textContent}
                 onChange={(e) => setTextContent(e.target.value)}
                 placeholder="Type your notes here..."
-                className="min-h-[450px] text-base border-0 focus-visible:ring-0 bg-transparent"
+                className="min-h-[550px] text-base border-0 focus-visible:ring-0 bg-transparent"
               />
             </Card>
           </div>
