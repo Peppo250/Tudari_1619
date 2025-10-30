@@ -24,8 +24,17 @@ import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Canvas as FabricCanvas, PencilBrush, Circle, Rect, FabricImage } from "fabric";
+import { Stage, Layer, Line, Circle as KonvaCircle, Rect as KonvaRect, Image as KonvaImage } from "react-konva";
 import jsPDF from "jspdf";
+
+interface Stroke {
+  id: string;
+  tool: string;
+  points: number[];
+  stroke: string;
+  strokeWidth: number;
+  globalCompositeOperation?: string;
+}
 
 interface Question {
   question: string;
@@ -36,14 +45,18 @@ interface Question {
 const NoteEditor = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const stageRef = useRef<any>(null);
   const textSectionRef = useRef<HTMLDivElement>(null);
-  const [fabricCanvas, setFabricCanvas] = useState<FabricCanvas | null>(null);
+  const [strokes, setStrokes] = useState<Stroke[]>([]);
+  const [currentStroke, setCurrentStroke] = useState<Stroke | null>(null);
+  const isDrawing = useRef(false);
   const [title, setTitle] = useState("Untitled Note");
   const [textContent, setTextContent] = useState("");
   const [activeTool, setActiveTool] = useState<"select" | "pen" | "highlighter" | "eraser" | "rectangle" | "circle">("select");
   const [brushColor, setBrushColor] = useState("#3b82f6");
   const [brushSize, setBrushSize] = useState(2);
+  const [stageScale, setStageScale] = useState(1);
+  const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [summarizing, setSummarizing] = useState(false);
@@ -56,7 +69,7 @@ const NoteEditor = () => {
 
   useEffect(() => {
     loadNote();
-  }, [id, fabricCanvas]);
+  }, [id]);
 
   const loadNote = async () => {
     try {
@@ -86,11 +99,9 @@ const NoteEditor = () => {
           setQuizId(note.quiz_id);
           
           // Load canvas strokes if they exist
-          if (note.strokes && fabricCanvas && typeof note.strokes === 'object') {
-            fabricCanvas.loadFromJSON(note.strokes as any).then(() => {
-              fabricCanvas.renderAll();
-              toast.success("Canvas loaded!");
-            });
+          if (note.strokes && Array.isArray(note.strokes)) {
+            setStrokes(note.strokes as unknown as Stroke[]);
+            toast.success("Canvas loaded!");
           }
         }
       }
@@ -102,115 +113,149 @@ const NoteEditor = () => {
     }
   };
 
-  useEffect(() => {
-    if (!canvasRef.current) return;
+  const handleMouseDown = (e: any) => {
+    if (activeTool === "select") return;
 
-    const canvas = new FabricCanvas(canvasRef.current, {
-      width: 800,
-      height: 600,
-      backgroundColor: "#ffffff",
-    });
+    const stage = e.target.getStage();
+    const point = stage.getPointerPosition();
 
-    // Initialize drawing brush
-    canvas.freeDrawingBrush = new PencilBrush(canvas);
-    canvas.freeDrawingBrush.color = brushColor;
-    canvas.freeDrawingBrush.width = brushSize;
-
-    setFabricCanvas(canvas);
-    toast.success("Canvas ready!");
-
-    return () => {
-      canvas.dispose();
+    isDrawing.current = true;
+    
+    const newStroke: Stroke = {
+      id: `stroke-${Date.now()}`,
+      tool: activeTool,
+      points: [point.x, point.y],
+      stroke: activeTool === "eraser" ? "#ffffff" : activeTool === "highlighter" ? brushColor + "4D" : brushColor,
+      strokeWidth: activeTool === "highlighter" ? brushSize * 3 : activeTool === "eraser" ? brushSize * 3 : brushSize,
+      globalCompositeOperation: activeTool === "eraser" ? "destination-out" : "source-over"
     };
-  }, []);
+    
+    setCurrentStroke(newStroke);
+    setStrokes([...strokes, newStroke]);
+  };
 
-  useEffect(() => {
-    if (!fabricCanvas) return;
+  const handleMouseMove = (e: any) => {
+    if (!isDrawing.current || !currentStroke) return;
 
-    // Reset drawing mode
-    fabricCanvas.isDrawingMode = false;
+    const stage = e.target.getStage();
+    const point = stage.getPointerPosition();
 
-    if (activeTool === "select") {
-      fabricCanvas.selection = true;
-    } else if (activeTool === "pen" || activeTool === "highlighter" || activeTool === "eraser") {
-      fabricCanvas.isDrawingMode = true;
-      // Use semi-transparent color for highlighter instead of opacity property
-      const color = activeTool === "eraser" 
-        ? "#ffffff" 
-        : activeTool === "highlighter" 
-          ? brushColor + "4D" // Add alpha channel for transparency
-          : brushColor;
-      fabricCanvas.freeDrawingBrush.color = color;
-      fabricCanvas.freeDrawingBrush.width = activeTool === "highlighter" ? brushSize * 3 : activeTool === "eraser" ? brushSize * 3 : brushSize;
-    } else if (activeTool === "rectangle") {
-      const rect = new Rect({
-        left: 100,
-        top: 100,
-        fill: brushColor,
-        width: 100,
-        height: 100,
-        stroke: brushColor,
-        strokeWidth: 2
-      });
-      fabricCanvas.add(rect);
-      fabricCanvas.setActiveObject(rect);
-      setActiveTool("select");
-    } else if (activeTool === "circle") {
-      const circle = new Circle({
-        left: 100,
-        top: 100,
-        fill: brushColor,
-        radius: 50,
-        stroke: brushColor,
-        strokeWidth: 2
-      });
-      fabricCanvas.add(circle);
-      fabricCanvas.setActiveObject(circle);
-      setActiveTool("select");
+    if (activeTool === "rectangle" || activeTool === "circle") {
+      currentStroke.points = [currentStroke.points[0], currentStroke.points[1], point.x, point.y];
+    } else {
+      currentStroke.points = currentStroke.points.concat([point.x, point.y]);
     }
-  }, [activeTool, brushColor, brushSize, fabricCanvas]);
+
+    setStrokes((prevStrokes) => {
+      const newStrokes = [...prevStrokes];
+      newStrokes[newStrokes.length - 1] = { ...currentStroke };
+      return newStrokes;
+    });
+  };
+
+  const handleMouseUp = () => {
+    isDrawing.current = false;
+    setCurrentStroke(null);
+  };
+
+  const renderShape = (stroke: Stroke) => {
+    if (stroke.tool === "rectangle" && stroke.points.length >= 4) {
+      const x = stroke.points[0];
+      const y = stroke.points[1];
+      const width = stroke.points[2] - stroke.points[0];
+      const height = stroke.points[3] - stroke.points[1];
+      
+      return (
+        <KonvaRect
+          key={stroke.id}
+          x={x}
+          y={y}
+          width={width}
+          height={height}
+          stroke={stroke.stroke}
+          strokeWidth={stroke.strokeWidth}
+          fill="transparent"
+        />
+      );
+    }
+
+    if (stroke.tool === "circle" && stroke.points.length >= 4) {
+      const x = (stroke.points[0] + stroke.points[2]) / 2;
+      const y = (stroke.points[1] + stroke.points[3]) / 2;
+      const radius = Math.sqrt(
+        Math.pow(stroke.points[2] - stroke.points[0], 2) + 
+        Math.pow(stroke.points[3] - stroke.points[1], 2)
+      ) / 2;
+      
+      return (
+        <KonvaCircle
+          key={stroke.id}
+          x={x}
+          y={y}
+          radius={radius}
+          stroke={stroke.stroke}
+          strokeWidth={stroke.strokeWidth}
+          fill="transparent"
+        />
+      );
+    }
+
+    return (
+      <Line
+        key={stroke.id}
+        points={stroke.points}
+        stroke={stroke.stroke}
+        strokeWidth={stroke.strokeWidth}
+        lineCap="round"
+        lineJoin="round"
+        globalCompositeOperation={stroke.globalCompositeOperation as any}
+      />
+    );
+  };
 
   const handleZoomIn = () => {
-    if (!fabricCanvas) return;
-    const zoom = fabricCanvas.getZoom();
-    fabricCanvas.setZoom(zoom * 1.1);
+    setStageScale(stageScale * 1.1);
   };
 
   const handleZoomOut = () => {
-    if (!fabricCanvas) return;
-    const zoom = fabricCanvas.getZoom();
-    fabricCanvas.setZoom(zoom / 1.1);
+    setStageScale(stageScale / 1.1);
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !fabricCanvas) return;
+    if (!file) return;
 
     const reader = new FileReader();
     reader.onload = (event) => {
       const imgUrl = event.target?.result as string;
-      FabricImage.fromURL(imgUrl).then((img) => {
-        img.scaleToWidth(200);
-        fabricCanvas.add(img);
+      const img = new Image();
+      img.onload = () => {
+        const newStroke: Stroke = {
+          id: `image-${Date.now()}`,
+          tool: "image",
+          points: [100, 100], // Default position
+          stroke: imgUrl,
+          strokeWidth: 0
+        };
+        setStrokes([...strokes, newStroke]);
         toast.success("Image imported!");
-      });
+      };
+      img.src = imgUrl;
     };
     reader.readAsDataURL(file);
   };
 
   const handleSave = async () => {
-    if (!id || !fabricCanvas) return;
+    if (!id) return;
     
     setSaving(true);
     try {
-      const canvasJSON = fabricCanvas.toJSON();
-      
       const { error } = await supabase
         .from('notes')
         .update({
           title,
           text_content: textContent,
-          strokes: canvasJSON as any,
+          strokes: strokes as any,
           updated_at: new Date().toISOString()
         })
         .eq('id', id);
@@ -328,7 +373,7 @@ const NoteEditor = () => {
   };
 
   const exportToPDF = async () => {
-    if (!fabricCanvas || !textSectionRef.current) return;
+    if (!stageRef.current || !textSectionRef.current) return;
 
     try {
       toast.info("Generating PDF...");
@@ -344,7 +389,8 @@ const NoteEditor = () => {
       let yOffset = 35;
       
       // Canvas
-      const canvasDataURL = fabricCanvas.toDataURL({ format: 'png', multiplier: 1 });
+      const stage = stageRef.current;
+      const canvasDataURL = stage.toDataURL({ pixelRatio: 2 });
       const canvasAspectRatio = 800 / 600;
       const canvasWidth = pageWidth - 20;
       const canvasHeight = canvasWidth / canvasAspectRatio;
@@ -508,11 +554,41 @@ const NoteEditor = () => {
               </div>
             </div>
             <Card className="border-0 shadow-strong overflow-hidden bg-white">
-              <canvas 
-                ref={canvasRef} 
-                className="w-full border-0"
-                style={{ display: 'block', touchAction: 'none' }}
-              />
+              <Stage
+                width={800}
+                height={600}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                ref={stageRef}
+                scaleX={stageScale}
+                scaleY={stageScale}
+                x={stagePos.x}
+                y={stagePos.y}
+              >
+                <Layer>
+                  {/* Grid */}
+                  {Array.from({ length: 40 }).map((_, i) => (
+                    <Line
+                      key={`v-${i}`}
+                      points={[i * 20, 0, i * 20, 600]}
+                      stroke="#eee"
+                      strokeWidth={0.5}
+                    />
+                  ))}
+                  {Array.from({ length: 30 }).map((_, i) => (
+                    <Line
+                      key={`h-${i}`}
+                      points={[0, i * 20, 800, i * 20]}
+                      stroke="#eee"
+                      strokeWidth={0.5}
+                    />
+                  ))}
+                  
+                  {/* Strokes */}
+                  {strokes.map(renderShape)}
+                </Layer>
+              </Stage>
             </Card>
           </div>
 
