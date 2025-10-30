@@ -56,7 +56,7 @@ const NoteEditor = () => {
 
   useEffect(() => {
     loadNote();
-  }, [id]);
+  }, [id, fabricCanvas]);
 
   const loadNote = async () => {
     try {
@@ -84,6 +84,14 @@ const NoteEditor = () => {
           setTextContent(note.text_content || "");
           setSummary(note.summary || "");
           setQuizId(note.quiz_id);
+          
+          // Load canvas strokes if they exist
+          if (note.strokes && fabricCanvas && typeof note.strokes === 'object') {
+            fabricCanvas.loadFromJSON(note.strokes as any).then(() => {
+              fabricCanvas.renderAll();
+              toast.success("Canvas loaded!");
+            });
+          }
         }
       }
     } catch (error) {
@@ -499,10 +507,11 @@ const NoteEditor = () => {
                 </label>
               </div>
             </div>
-            <Card className="border-0 shadow-strong overflow-hidden bg-amber-light/20">
+            <Card className="border-0 shadow-strong overflow-hidden bg-white">
               <canvas 
                 ref={canvasRef} 
-                className="w-full border rounded-lg"
+                className="w-full border-0"
+                style={{ display: 'block', touchAction: 'none' }}
               />
             </Card>
           </div>
