@@ -89,7 +89,7 @@ serve(async (req) => {
           messages: [
             { 
               role: 'system', 
-              content: 'You are a helpful assistant that creates educational quizzes. Generate 5 multiple-choice questions based on the note content. Return ONLY valid JSON with this structure: {"questions": [{"question": "...", "options": ["A", "B", "C", "D"], "correct": 0}]}' 
+              content: 'You are a helpful assistant that creates educational quizzes. Generate 5 multiple-choice questions based on the note content. Return ONLY valid JSON with this structure: {"questions": [{"question": "...", "options": ["A", "B", "C", "D"], "correct_answer": 0}]} where correct_answer is the index (0-3) of the correct option.' 
             },
             { 
               role: 'user', 
@@ -117,11 +117,19 @@ serve(async (req) => {
         // If AI didn't return pure JSON, try to extract it
         const match = quizContent.match(/\{[\s\S]*\}/);
         if (match) {
-          questions = JSON.parse(match[0]).questions;
+          const extracted = JSON.parse(match[0]);
+          questions = extracted.questions;
         } else {
           throw new Error('Failed to parse quiz');
         }
       }
+
+      // Normalize questions to ensure correct_answer field exists
+      questions = questions.map((q: any) => ({
+        question: q.question,
+        options: q.options,
+        correct_answer: q.correct_answer !== undefined ? q.correct_answer : q.correct || 0
+      }));
 
       // Create quiz in database
       const { data: quiz, error: quizError } = await supabase
@@ -139,7 +147,13 @@ serve(async (req) => {
         throw quizError;
       }
 
-      return new Response(JSON.stringify({ quiz }), {
+      // Update note with quiz_id
+      await supabase
+        .from('notes')
+        .update({ quiz_id: quiz.id })
+        .eq('id', noteId);
+
+      return new Response(JSON.stringify({ quizId: quiz.id }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
