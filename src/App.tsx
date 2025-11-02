@@ -13,6 +13,7 @@ import Productivity from "./pages/Productivity";
 import Profile from "./pages/Profile";
 import ProjectBoard from "./pages/ProjectBoard";
 import NotFound from "./pages/NotFound";
+import { OfflineIndicator } from "./components/OfflineIndicator";
 
 const queryClient = new QueryClient();
 
@@ -21,6 +22,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
+      <OfflineIndicator />
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Navigate to="/auth" replace />} />
