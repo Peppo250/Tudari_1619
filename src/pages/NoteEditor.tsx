@@ -23,6 +23,7 @@ import {
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
+import { offlineSupabase } from "@/lib/offlineSupabase";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Stage, Layer, Line, Circle as KonvaCircle, Rect as KonvaRect, Image as KonvaImage } from "react-konva";
 import jsPDF from "jspdf";
@@ -80,7 +81,7 @@ const NoteEditor = () => {
       }
 
       if (id) {
-        const { data: note, error } = await supabase
+        const { data: note, error } = await offlineSupabase
           .from('notes')
           .select('*')
           .eq('id', id)
@@ -250,7 +251,7 @@ const NoteEditor = () => {
     
     setSaving(true);
     try {
-      const { error } = await supabase
+      const { error } = await offlineSupabase
         .from('notes')
         .update({
           title,
@@ -323,7 +324,7 @@ const NoteEditor = () => {
     if (!quizIdToLoad) return;
     
     try {
-      const { data, error } = await supabase
+      const { data, error } = await offlineSupabase
         .from('quizzes')
         .select('questions')
         .eq('id', quizIdToLoad)
@@ -350,7 +351,7 @@ const NoteEditor = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { error } = await supabase.from('quiz_results').insert({
+      const { error } = await offlineSupabase.from('quiz_results').insert({
         quiz_id: quizId,
         user_id: user.id,
         score,

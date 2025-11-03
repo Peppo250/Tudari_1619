@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ArrowLeft, Plus, Clock, Loader2, Trash2, Download } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { offlineSupabase } from "@/lib/offlineSupabase";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -49,7 +50,7 @@ const Logs = () => {
         return;
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await offlineSupabase
         .from('logs')
         .select('*')
         .eq('user_id', user.id)
@@ -75,7 +76,7 @@ const Logs = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { error } = await supabase
+      const { error } = await offlineSupabase
         .from('logs')
         .insert({
           ...newLog,
@@ -104,7 +105,7 @@ const Logs = () => {
 
   const deleteLog = async (id: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await offlineSupabase
         .from('logs')
         .delete()
         .eq('id', id);

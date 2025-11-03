@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ArrowLeft, Plus, Folder, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { offlineSupabase } from "@/lib/offlineSupabase";
 import { Textarea } from "@/components/ui/textarea";
 
 interface Project {
@@ -36,7 +37,7 @@ const Projects = () => {
         return;
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await offlineSupabase
         .from('projects')
         .select('*')
         .eq('user_id', user.id)
@@ -62,7 +63,7 @@ const Projects = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { error } = await supabase
+      const { error } = await offlineSupabase
         .from('projects')
         .insert({
           title: newProject.title,
@@ -84,7 +85,7 @@ const Projects = () => {
 
   const deleteProject = async (id: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await offlineSupabase
         .from('projects')
         .delete()
         .eq('id', id);

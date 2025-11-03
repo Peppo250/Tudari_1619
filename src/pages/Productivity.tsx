@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { ArrowLeft, TrendingUp, Award, Flame, Target, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { offlineSupabase } from "@/lib/offlineSupabase";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface Productivity {
@@ -47,7 +48,7 @@ const Productivity = () => {
 
       // Load today's productivity
       const today = new Date().toISOString().split('T')[0];
-      const { data: prodData, error: prodError } = await supabase
+      const { data: prodData, error: prodError } = await offlineSupabase
         .from('productivity')
         .select('*')
         .eq('user_id', user.id)
@@ -65,7 +66,7 @@ const Productivity = () => {
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
       const startDate = sevenDaysAgo.toISOString().split('T')[0];
       
-      const { data: weekProdData, error: weekError } = await supabase
+      const { data: weekProdData, error: weekError } = await offlineSupabase
         .from('productivity')
         .select('*')
         .eq('user_id', user.id)
@@ -77,7 +78,7 @@ const Productivity = () => {
       setWeekData(weekProdData || []);
 
       // Load rewards
-      const { data: rewardsData, error: rewardsError } = await supabase
+      const { data: rewardsData, error: rewardsError } = await offlineSupabase
         .from('rewards')
         .select('*')
         .eq('user_id', user.id)

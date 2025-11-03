@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { ArrowLeft, User, Mail, Save, Loader2, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { offlineSupabase } from "@/lib/offlineSupabase";
 
 interface Profile {
   id: string;
@@ -40,7 +41,7 @@ const Profile = () => {
         return;
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await offlineSupabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
@@ -76,16 +77,16 @@ const Profile = () => {
         .map(s => s.trim())
         .filter(s => s.length > 0);
 
-      const { error } = await supabase
+      const { error } = await offlineSupabase
         .from('profiles')
-        .upsert({
-          id: profile.id,
+        .update({
           username: formData.username,
           name: formData.name,
           email: formData.email,
           free_time: freeTimeArray,
           updated_at: new Date().toISOString()
-        });
+        })
+        .eq('id', profile.id);
 
       if (error) throw error;
       

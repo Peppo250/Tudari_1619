@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Plus, Loader2, GripVertical, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { offlineSupabase } from "@/lib/offlineSupabase";
 
 interface Task {
   id: string;
@@ -52,8 +53,8 @@ const ProjectBoard = () => {
       }
 
       const [projectData, tasksData] = await Promise.all([
-        supabase.from('projects').select('*').eq('id', projectId).single(),
-        supabase.from('tasks').select('*').eq('project_id', projectId).eq('user_id', user.id)
+        offlineSupabase.from('projects').select('*').eq('id', projectId).single(),
+        offlineSupabase.from('tasks').select('*').eq('project_id', projectId).eq('user_id', user.id)
       ]);
 
       if (projectData.error) throw projectData.error;
@@ -79,7 +80,7 @@ const ProjectBoard = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { error } = await supabase.from('tasks').insert({
+      const { error } = await offlineSupabase.from('tasks').insert({
         ...newTask,
         project_id: projectId,
         user_id: user.id,
@@ -101,7 +102,7 @@ const ProjectBoard = () => {
 
   const updateTaskStatus = async (taskId: string, newStatus: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await offlineSupabase
         .from('tasks')
         .update({ 
           status: newStatus,
@@ -119,7 +120,7 @@ const ProjectBoard = () => {
 
   const deleteTask = async (taskId: string) => {
     try {
-      const { error } = await supabase.from('tasks').delete().eq('id', taskId);
+      const { error } = await offlineSupabase.from('tasks').delete().eq('id', taskId);
       if (error) throw error;
       toast.success("Task deleted");
       loadData();

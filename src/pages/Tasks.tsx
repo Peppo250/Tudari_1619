@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Plus, CheckSquare, Loader2, Trash2, Circle, CheckCircle2, Folder, LayoutGrid } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { offlineSupabase } from "@/lib/offlineSupabase";
 
 interface Task {
   id: string;
@@ -56,8 +57,8 @@ const Tasks = () => {
       }
 
       const [tasksData, projectsData] = await Promise.all([
-        supabase.from('tasks').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-        supabase.from('projects').select('*').eq('user_id', user.id).order('updated_at', { ascending: false })
+        offlineSupabase.from('tasks').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+        offlineSupabase.from('projects').select('*').eq('user_id', user.id).order('updated_at', { ascending: false })
       ]);
 
       if (tasksData.error) throw tasksData.error;
@@ -83,7 +84,7 @@ const Tasks = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { error } = await supabase.from('tasks').insert({
+      const { error } = await offlineSupabase.from('tasks').insert({
         title: newTask.title,
         description: newTask.description,
         priority: newTask.priority,
@@ -115,11 +116,13 @@ const Tasks = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data, error } = await supabase.from('projects').insert({
+      const result = await offlineSupabase.from('projects').insert({
         title: newProject.title,
         description: newProject.description,
         user_id: user.id
       }).select().single();
+      
+      const { data, error } = result;
 
       if (error) throw error;
 
@@ -137,7 +140,7 @@ const Tasks = () => {
   const toggleTaskStatus = async (taskId: string, currentStatus: string) => {
     try {
       const newStatus = currentStatus === 'completed' ? 'todo' : 'completed';
-      const { error } = await supabase
+      const { error } = await offlineSupabase
         .from('tasks')
         .update({ 
           status: newStatus,
@@ -155,7 +158,7 @@ const Tasks = () => {
 
   const deleteTask = async (taskId: string) => {
     try {
-      const { error } = await supabase.from('tasks').delete().eq('id', taskId);
+      const { error } = await offlineSupabase.from('tasks').delete().eq('id', taskId);
       if (error) throw error;
       toast.success("Task deleted");
       loadData();
@@ -167,7 +170,7 @@ const Tasks = () => {
 
   const deleteProject = async (projectId: string) => {
     try {
-      const { error } = await supabase.from('projects').delete().eq('id', projectId);
+      const { error } = await offlineSupabase.from('projects').delete().eq('id', projectId);
       if (error) throw error;
       toast.success("Project deleted");
       setSelectedProjectId("all");

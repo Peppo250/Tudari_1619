@@ -7,6 +7,7 @@ import { ArrowLeft, Plus, FileText, Search, Loader2, Trash2, FolderPlus, Folder 
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
+import { offlineSupabase } from "@/lib/offlineSupabase";
 import { DeleteNoteDialog } from "@/components/DeleteNoteDialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
@@ -44,7 +45,7 @@ const Notes = () => {
         return;
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await offlineSupabase
         .from('notes')
         .select('*')
         .eq('user_id', user.id)
@@ -66,21 +67,26 @@ const Notes = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data, error } = await supabase
+      const { error } = await offlineSupabase
         .from('notes')
         .insert({
           title: "Untitled Note",
           user_id: user.id,
           content_type: "canvas",
           folder: null
-        })
-        .select()
-        .single();
+        });
 
       if (error) throw error;
 
+      // Reload to get the created note
+      await loadNotes();
+      const latestNote = notes[0];
+      if (latestNote) {
+        navigate(`/notes/${latestNote.id}`);
+      }
+
+      
       toast.success("New note created!");
-      navigate(`/notes/${data.id}`);
     } catch (error) {
       console.error("Error creating note:", error);
       toast.error("Failed to create note");
@@ -91,7 +97,7 @@ const Notes = () => {
     if (!noteToDelete) return;
     
     try {
-      const { error } = await supabase
+      const { error } = await offlineSupabase
         .from('notes')
         .delete()
         .eq('id', noteToDelete.id);
@@ -113,7 +119,7 @@ const Notes = () => {
     if (!selectedNoteForFolder) return;
     
     try {
-      const { error } = await supabase
+      const { error } = await offlineSupabase
         .from('notes')
         .update({ folder: newFolderName || null })
         .eq('id', selectedNoteForFolder.id);
